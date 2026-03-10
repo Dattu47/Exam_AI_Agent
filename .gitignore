@@ -1,0 +1,23 @@
+# Virtual environment
+venv/
+env/
+.env
+
+# Python compilation files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Output or logs
+*.log
+logs/
+
+# Vector store if any (local directories)
+vector_db/
+faiss_index/
+data/
+
+# IDE files
+.vscode/
+.idea/
