@@ -4,7 +4,9 @@ Handles saving and retrieving exam research data to persist history and enable c
 """
 
 import os
+
 from typing import Optional, Dict, Any, List
+import streamlit as st
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -21,8 +23,12 @@ class SupabaseService:
     """Service to interact with the Supabase database for caching and tracking."""
     
     def __init__(self):
-        self.url: str = os.environ.get("SUPABASE_URL", "")
-        self.key: str = os.environ.get("SUPABASE_KEY", "")
+        try:
+            self.url: str = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", ""))
+            self.key: str = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", ""))
+        except Exception:
+            self.url: str = os.environ.get("SUPABASE_URL", "")
+            self.key: str = os.environ.get("SUPABASE_KEY", "")
         self.client: Optional[Client] = None
         
         if self.url and self.key and "your_supabase" not in self.url:

@@ -14,40 +14,11 @@ logger = get_logger(__name__)
 class StudyPlanService:
     """
     Generates study plan (timetable + strategy) from exam name and optional context.
-    Uses LLM when available; otherwise returns a sensible template.
+    Uses LLM constructed via ChatGroq; otherwise returns a sensible template.
     """
 
-    def __init__(self):
-        self._llm = None
-
-    def _is_ollama_reachable(self) -> bool:
-        """Quick check: is Ollama running and responding?"""
-        try:
-            import requests as _req
-            resp = _req.get(f"{settings.LLM_BASE_URL}/api/tags", timeout=3)
-            return resp.status_code == 200
-        except Exception:
-            return False
-
-    def _get_llm(self):
-        """Lazy-load Ollama LLM only when Ollama is actually reachable."""
-        if self._llm is not None:
-            return self._llm
-        if not self._is_ollama_reachable():
-            logger.warning("Ollama not reachable at %s. Using template plan.", settings.LLM_BASE_URL)
-            return None
-        try:
-            from langchain_ollama import ChatOllama
-            self._llm = ChatOllama(
-                base_url=settings.LLM_BASE_URL,
-                model=settings.LLM_MODEL,
-                timeout=settings.LLM_TIMEOUT,
-            )
-            logger.info("Ollama LLM loaded (%s @ %s)", settings.LLM_MODEL, settings.LLM_BASE_URL)
-            return self._llm
-        except Exception as e:
-            logger.warning("Ollama LLM init failed: %s. Using template plan.", e)
-            return None
+    def __init__(self, llm=None):
+        self._llm = llm
 
     def _template_plan(self, exam_name: str, important_topics: Optional[List[str]] = None) -> List[dict]:
         """Return a study plan for this exam using real topics when available."""
@@ -114,7 +85,7 @@ class StudyPlanService:
         Returns:
             List of {"week": int, "focus": str, "tasks": List[str]}
         """
-        llm = self._get_llm()
+        llm = self._llm
         if llm is None:
             return self._template_plan(exam_name, important_topics)
 
@@ -122,22 +93,22 @@ class StudyPlanService:
             from langchain_core.prompts import ChatPromptTemplate
             prompt = ChatPromptTemplate.from_messages([
                 ("system", 
-                 "You are an expert exam preparation coach. Generate a {weeks}-week study plan for the exam. "
+                 "You are an expert exam preparation coach. Generate an attractive, highly detailed, and rigorous {weeks}-week study plan for the exam. "
                  "CRITICAL INSTRUCTIONS:\n"
-                 "1. You MUST explicitly use the provided 'Important topics' and 'Syllabus summary' to schedule real subjects.\n"
-                 "2. Each week MUST contain a day-wise breakdown (Day 1, Day 2, etc.) or distinct, highly granular task phases.\n"
-                 "3. You MUST include a short practical 'tip' or note for each week's block to guide the student.\n"
+                 "1. You MUST explicitly use the exact 'Important topics' and 'Syllabus summary' provided below. Frame the schedule strictly around these real subjects. Do NOT use generic placeholders.\n"
+                 "2. Each week MUST contain a day-wise breakdown (Day 1, Day 2, etc.) or distinct, highly granular task phases covering specific syllabus chapters.\n"
+                 "3. You MUST include a short practical 'tip' or note for each week's block to guide the student on strategy.\n"
                  "4. You MUST reply with a valid JSON array and absolutely nothing else. Do not output markdown codeblocks.\n"
                  'Format exactly like this: [{{"week": 1, "focus": "Actual Topic 1 & 2", "tip": "Focus on high-weightage formulas", "tasks": ["Day 1-2: Study theory for Topic 1", "Day 3: Solve 50 MCQs", "Day 4-7: Mock tests"]}}]'),
                 ("human", "Exam: {exam_name}. Syllabus summary: {syllabus}. Important topics: {topics}."),
             ])
             chain = prompt | llm
             syllabus = syllabus_summary or "General syllabus"
-            topics = ", ".join(important_topics[:15]) if important_topics else "All syllabus topics"
+            topics = ", ".join(important_topics[:50]) if important_topics else "All syllabus topics"
             response = chain.invoke({
                 "exam_name": exam_name,
-                "syllabus": syllabus[:500],
-                "topics": topics[:500],
+                "syllabus": syllabus[:5000],
+                "topics": topics[:3000],
                 "weeks": weeks,
             })
             text = response.content if hasattr(response, "content") else str(response)

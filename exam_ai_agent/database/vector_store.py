@@ -13,27 +13,7 @@ logger = get_logger(__name__)
 
 
 def _get_embeddings():
-    """Create embeddings model: prefer Ollama, fallback to FakeEmbeddings so app always runs."""
-    try:
-        from langchain_ollama import OllamaEmbeddings
-        model_name = getattr(settings, "EMBEDDING_MODEL", None) or "nomic-embed-text"
-        emb = OllamaEmbeddings(
-            base_url=settings.LLM_BASE_URL,
-            model=model_name,
-        )
-        # Validate model is present; Ollama returns 404 if not pulled.
-        try:
-            emb.embed_query("healthcheck")
-        except Exception as e:
-            raise RuntimeError(
-                f'Ollama embedding model "{model_name}" not available. '
-                f'Run: ollama pull {model_name}'
-            ) from e
-
-        logger.info("Using Ollama embeddings (%s)", model_name)
-        return emb
-    except Exception as e:
-        logger.warning("Ollama embeddings not available (%s). Using fake embeddings.", e)
+    """Create embeddings model: returns FakeEmbeddings since Ollama is removed."""
     try:
         from langchain_core.embeddings import FakeEmbeddings
     except ImportError:

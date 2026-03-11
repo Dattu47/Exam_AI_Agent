@@ -2,7 +2,11 @@
 Response Agent: Formats the final results and coordinates the vector store persistence.
 """
 
+import json
 from typing import List, Dict, Any
+import streamlit as st
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 from exam_ai_agent.database.vector_store import VectorStore
 from exam_ai_agent.services.syllabus_service import SyllabusService
 from exam_ai_agent.services.papers_service import PapersService
@@ -18,6 +22,17 @@ class ResponseAgent:
         self.syllabus_service = syllabus_service or SyllabusService()
         self.pdf_tool = PDFDownloaderTool(WebScraperTool())
         self.papers_service = papers_service or PapersService(self.pdf_tool)
+        
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+        if api_key:
+            self.llm = ChatGroq(
+                model="llama-3.3-70b-versatile",
+                api_key=api_key,
+                temperature=0.2
+            )
+        else:
+            logger.warning("[ResponseAgent] Missing GROQ_API_KEY in st.secrets.")
+            self.llm = None
 
     def format_final_response(
             self,
@@ -112,6 +127,39 @@ class ResponseAgent:
             if url and title:
                 result["youtube_lectures"].append({"title": title[:300], "url": url, "type": "video"})
         result["youtube_lectures"] = result["youtube_lectures"][:10]
+
+        # Step 6: Final LLM Formatting & Deduplication Check
+        if self.llm:
+            logger.info("[ResponseAgent] Validating final payload via LLM...")
+            try:
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", 
+                     "You are an expert strict JSON formatter. \n"
+                     "Review the provided JSON data. Apply these STRICT RULES:\n"
+                     "1. Remove ANY duplicate URLs globally across all sections.\n"
+                     "2. Ensure exact JSON structure: keys MUST be exactly 'syllabus', 'previous_papers', 'study_plan', 'resources', 'youtube_lectures'.\n"
+                     "3. 'previous_papers' headings MUST match exam year/title (e.g., '2023 Paper').\n"
+                     "4. Output ONLY valid JSON, absolutely NO markdown decorators (do NOT wrap in ```json).\n"
+                     "5. CRITICAL: Do NOT move items between categories! Any links containing youtube.com MUST stay in 'youtube_lectures', and MUST NOT be moved to 'resources'.\n"
+                    ),
+                    ("human", "{data}")
+                ])
+                chain = prompt | self.llm
+                
+                # Trim result slightly if needed to avoid max context
+                res = chain.invoke({
+                    "data": json.dumps(result)[:25000]
+                })
+                
+                text = res.content.strip()
+                if text.startswith("```json"): text = text[7:]
+                if text.startswith("```"): text = text[3:]
+                if text.endswith("```"): text = text[:-3]
+                
+                result = json.loads(text)
+                
+            except Exception as e:
+                logger.warning(f"[ResponseAgent] Final payload refinement failed: {e}")
 
         logger.info("[ResponseAgent] Final payload generated successfully.")
         return result

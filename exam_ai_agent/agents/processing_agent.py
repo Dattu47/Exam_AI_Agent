@@ -2,7 +2,11 @@
 Processing Agent: Cleans text, runs extraction services, removes duplicates, and finds important topics.
 """
 
+import json
 from typing import List, Dict, Any, Tuple
+import streamlit as st
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 from exam_ai_agent.services.syllabus_service import SyllabusService
 from exam_ai_agent.utils.logger import get_logger
 
@@ -30,6 +34,16 @@ def _slice_gate_cs_section(text: str) -> str:
 class ProcessingAgent:
     def __init__(self, syllabus_service: SyllabusService = None):
         self.syllabus_service = syllabus_service or SyllabusService()
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+        if api_key:
+            self.llm = ChatGroq(
+                model="llama-3.3-70b-versatile",
+                api_key=api_key,
+                temperature=0.2
+            )
+        else:
+            logger.warning("[ProcessingAgent] Missing GROQ_API_KEY in st.secrets.")
+            self.llm = None
 
     def extract_and_process(self, exam_name: str, scraped_pages: List[Dict[str, Any]], syllabus_urls: List[str], pattern_results: List[Any]) -> Tuple[List[Dict[str, str]], List[str], List[str]]:
         """
@@ -116,4 +130,52 @@ class ProcessingAgent:
                 if len(important) >= 15:
                     break
                     
+        # LLM Refinement Phase
+        if self.llm and scraped_syllabus_items:
+            logger.info("[ProcessingAgent] Refining topics via LLM...")
+            try:
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", 
+                     "You are an expert exam preparation processor. Clean up the following syllabus list and important topics for the exam.\n"
+                     "RULES:\n"
+                     "1. Remove redundant or duplicate topics.\n"
+                     "2. Standardize topic names to be professional.\n"
+                     "3. You MUST respond with ONLY valid JSON and absolutely NO markdown blocks. \n"
+                     "Format: {{\"topics\": [\"Topic 1\", \"Topic 2\"], \"syllabus\": [{{\"topic\": \"Topic 1\", \"subtopics\": [\"Sub 1\"], \"description\": \"Desc\"}}]}}"
+                    ),
+                    ("human", "Exam: {exam_name}. Important Topics: {topics}. Syllabus: {syllabus}")
+                ])
+                chain = prompt | self.llm
+                res = chain.invoke({
+                    "exam_name": exam_name,
+                    "topics": json.dumps(important[:50]),
+                    "syllabus": json.dumps([{"topic": s["topic"], "subtopics": s.get("subtopics", []), "description": s.get("description", "")} for s in scraped_syllabus_items[:50]])
+                })
+                
+                text = res.content.strip()
+                if text.startswith("```json"): text = text[7:]
+                if text.startswith("```"): text = text[3:]
+                if text.endswith("```"): text = text[:-3]
+                
+                parsed = json.loads(text)
+                
+                # Re-attach source_urls
+                source_map = {s["topic"].lower(): s.get("source_url", "") for s in scraped_syllabus_items}
+                
+                refined_syllabus = []
+                for item in parsed.get("syllabus", []):
+                    u = source_map.get(str(item.get("topic", "")).lower(), "")
+                    refined_syllabus.append({
+                        "topic": item.get("topic", "Topic"),
+                        "subtopics": item.get("subtopics", []),
+                        "description": item.get("description", ""),
+                        "source_url": u
+                    })
+                    
+                scraped_syllabus_items = refined_syllabus
+                important = parsed.get("topics", important[:50])
+                
+            except Exception as e:
+                logger.warning(f"[ProcessingAgent] LLM refinement failed: {e}")
+                
         return scraped_syllabus_items, important[:20], all_text_for_vector

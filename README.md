@@ -9,9 +9,9 @@ An intelligent, multi-agent orchestration system designed to automate competitiv
 *   **Multi-Agent Architecture:** A modular system orchestrated by a central `ResearchAgent`, delegating tasks to distinct experts:
     *   🔍 **Search Agent:** Autonomously formulates precise search queries for syllabi, past papers, YouTube playlists, and recommended books using DuckDuckGo.
     *   🕷️ **Scraping Agent:** Interrogates target URLs (processing PDFs and HTML) to uncover deep links and scrape raw content.
-    *   🧠 **Processing Agent:** Cleans, extracts, shapes, and deduplicates the raw scraped content into structured outputs utilizing specialized Regex and HTML parsing strategies.
-    *   📅 **Study Plan Agent:** Uses local LLMs (Ollama/Llama2) to generate a rigorous, syllabus-tailored 4-week study plan with daily breakdowns and actionable tips.
-    *   🏗️ **Response Agent:** Combines all processed data into a strict, unified JSON contract for the frontend, incorporating a final absolute base-URL deduplication safety net.
+    *   🧠 **Processing Agent:** Cleans, extracts, shapes, and deduplicates the raw scraped content into structured outputs utilizing specialized Regex and HTML parsing strategies with Groq LLM refinement.
+    *   📅 **Study Plan Agent:** Uses Groq API (Llama3-70B) to generate a rigorous, syllabus-tailored 4-week study plan with daily breakdowns and actionable tips.
+    *   🏗️ **Response Agent:** Combines all processed data into a strict, unified JSON contract for the frontend, incorporating a final absolute base-URL deduplication safety net via Groq LLM.
 *   **Supabase Database Caching & Analytics:** Implements edge-caching using Supabase. The orchestrator checks Supabase first; if an exam has been queried previously, it returns the cached strategy in milliseconds.
 *   **Vector Database Fallback (FAISS):** Periodically chunks scraped raw text to populate a FAISS Vector database for future RAG (Retrieval-Augmented Generation) enhancements.
 *   **Strict Deduplication:** Ensures 100% unique resources by stripping tracking queries, fragment hashes, and aggressive domain matching across PDFs, YouTube URLs, and reference links.
@@ -26,8 +26,8 @@ An intelligent, multi-agent orchestration system designed to automate competitiv
 2.  **Orchestrator Interception:** `ResearchAgent` queries `SupabaseService`. If a cached version exists, it bypasses computation entirely.
 3.  **Search & Strategy:** `SearchAgent` dispatches ~10 concurrent queries to isolate official sites, PDF repos, and YouTube channels. 
 4.  **Deep Scraping:** URLs are passed to `ScrapingAgent` to extract text footprints. Hidden PDFs discovered within HTML pages are recursively added to the stack.
-5.  **Data Processing:** `ProcessingAgent` utilizes `SyllabusService` and `PapersService` to cleanse the data. Duplicate links are stripped at the base-domain level. Text is forced into hierarchical dictionaries.
-6.  **LLM Generation:** The 4-week study plan is constructed via `StudyPlanAgent`, piping the filtered Syllabus and Important Topics into a strict JSON-formatted prompt via Langchain to a local Ollama instance.
+5.  **Data Processing:** `ProcessingAgent` utilizes `SyllabusService` and `PapersService` to cleanse the data. Duplicate links are stripped at the base-domain level. Text is forced into hierarchical dictionaries and refined via Groq prompt engineering.
+6.  **LLM Generation:** The 4-week study plan is constructed via `StudyPlanAgent`, piping the filtered Syllabus and Important Topics into a strict JSON-formatted prompt via Langchain to Groq Cloud.
 7.  **Final Formatting & Persistence:** `ResponseAgent` combines all segments into a monolithic dictionary. The orchestrator pushes this final output to Supabase (`exam_resources` and `study_plans` tables) for subsequent caches and sends it back to the Streamlit UI. 
 
 ---
@@ -37,8 +37,8 @@ An intelligent, multi-agent orchestration system designed to automate competitiv
 *   **Language:** Python 3.10+
 *   **Frontend:** Streamlit (`streamlit`)
 *   **Database / Backend:** Supabase (PostgreSQL via `supabase-py`)
-*   **AI Orchestration:** LangChain (`langchain-core`, `langchain-ollama`)
-*   **Local LLM Server:** Ollama (Llama2/Llama3 for local inference)
+*   **AI Orchestration:** LangChain (`langchain-core`, `langchain-groq`)
+*   **Cloud LLM Provider:** Groq (Llama3-70B for fast cloud inference)
 *   **Web Scrapers/Parsers:** `beautifulsoup4`, `requests`, `duckduckgo-search` (ddgs), `PyPDF2`
 *   **Memory / VDB:** FAISS (`faiss-cpu`) 
 
@@ -48,20 +48,18 @@ An intelligent, multi-agent orchestration system designed to automate competitiv
 
 ### 1. Pre-requisites
 *   **Python:** Install [Python 3.10+](https://www.python.org/downloads/)
-*   **Ollama:** Install [Ollama](https://ollama.com/) and pull a model (e.g., `ollama run llama2`)
 *   **Supabase:** Create a free project at [Supabase](https://supabase.com/) and run the provided SQL migration.
+*   **Groq API Key:** Get a free API key from [Groq Console](https://console.groq.com/).
 
 ### 2. Database Migration
-Run the included `supabase_setup.sql` script in your Supabase SQL Editor. This initializes the `user_queries`, `exam_resources`, and `study_plans` tables with their respective JSONB constraints to hold the output structures (including the specifically added `youtube_lectures` column).
+Run the included `supabase_setup.sql` script in your Supabase SQL Editor. This initializes the `user_queries`, `exam_resources`, and `study_plans` tables.
 
-### 3. Environment Variables
-Create a `.env` file in the root project directory containing your Supabase credentials:
-```env
+### 3. Environment Variables (Streamlit Secrets)
+Create a `.streamlit/secrets.toml` file in the root project directory:
+```toml
 SUPABASE_URL="your-supabase-project-url"
 SUPABASE_KEY="your-supabase-service-role-or-anon-key"
-LLM_BASE_URL="http://localhost:11434"
-LLM_MODEL="llama2"
-LLM_TIMEOUT=60
+GROQ_API_KEY="your-groq-api-key"
 ```
 
 ### 4. Install Dependencies

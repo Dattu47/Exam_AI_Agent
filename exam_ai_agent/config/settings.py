@@ -16,9 +16,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     """Application settings loaded from environment or .env file."""
 
-    # LLM Configuration - Ollama by default (run: ollama run llama2)
-    LLM_BASE_URL: str = Field(default="http://localhost:11434", description="Ollama API base URL")
-    LLM_MODEL: str = Field(default="llama2", description="Model name for Ollama (e.g., llama2, mistral)")
+    # LLM Configuration
+    LLM_MODEL: str = Field(default="llama3-70b-8192", description="Model name for Groq LLM")
     LLM_TIMEOUT: int = Field(default=120, description="Timeout in seconds for LLM calls")
 
     # Search & Scraping
