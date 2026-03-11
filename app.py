@@ -58,8 +58,8 @@ def main():
         st.info("👈 Please enter an exam name to begin your preparation journey.")
         return
 
-    # Clear results if exam changes
-    if "results" not in st.session_state or st.session_state.get("last_exam") != exam_name:
+    # Clear results if exam changes, or if user explicitly requested a fresh search
+    if "results" not in st.session_state or st.session_state.get("last_exam") != exam_name or force_refresh:
         st.session_state.results = None
 
     if st.button("Generate Strategy", type="primary", use_container_width=True):
