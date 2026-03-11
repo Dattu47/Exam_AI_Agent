@@ -9,8 +9,9 @@ from pathlib import Path
 import streamlit as st
 
 # Add the local directory to the Python path so local modules resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
+base_dir = str(Path(__file__).resolve().parent)
+if base_dir not in sys.path:
+    sys.path.insert(0, base_dir)
 # Import Orchestrator
 from exam_ai_agent.agents.research_agent import ResearchAgent
 
