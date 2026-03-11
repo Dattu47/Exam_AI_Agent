@@ -63,16 +63,17 @@ def main():
         st.session_state.results = None
 
     if st.button("Generate Strategy", type="primary", use_container_width=True):
-        with st.status("🧠 Initializing AI Agents...", expanded=True) as status:
-            st.write("🔎 Agents are scouring the web and consulting the database cache for " + exam_name)
-            res = run_research_natively(exam_name, force=force_refresh)
-            
-            if res:
-                st.session_state.results = res
-                st.session_state.last_exam = exam_name
-                status.update(label="✅ Strategy Generated Successfully!", state="complete", expanded=False)
-            else:
-                status.update(label="❌ Failed to generate strategy.", state="error", expanded=True)
+        with st.spinner("🧠 Researching and compiling data..."):
+            with st.status("Initializing AI Agents...", expanded=True) as status:
+                st.write("🔎 Agents are scouring the web and consulting the database cache for " + exam_name)
+                res = run_research_natively(exam_name, force=force_refresh)
+                
+                if res:
+                    st.session_state.results = res
+                    st.session_state.last_exam = exam_name
+                    status.update(label="✅ Strategy Generated Successfully!", state="complete", expanded=False)
+                else:
+                    status.update(label="❌ Failed to generate strategy.", state="error", expanded=True)
 
     data = st.session_state.results
     if data:
@@ -127,7 +128,7 @@ def main():
                             with st.expander(f"**{topic_title}**"):
                                 # Check for hierarchical subtopics first
                                 subtopics = s.get("subtopics", [])
-                                if subtopics:
+                                if isinstance(subtopics, list) and subtopics:
                                     st.markdown("#### Subtopics:")
                                     for sub in subtopics:
                                         st.markdown(f"- {sub}")
@@ -149,11 +150,7 @@ def main():
                         col_text, col_btn = st.columns([4, 1])
                         with col_text:
                             st.subheader(p.get('title', 'Unknown Paper'))
-                            if p.get('type') == 'pdf':
-                                st.caption("PDF Document")
-                            else:
-                                st.caption("Web Resource")
-                                
+                            st.write(p.get('description', ''))
                         with col_btn:
                             st.link_button(
                                 "📥 Download PDF" if p.get('type') == 'pdf' else "🔗 Open Link", 
@@ -166,7 +163,8 @@ def main():
 
         # --- 3. Study Plan Tab ---
         with tab_plan:
-            st.header("📅 AI-Generated Study Plan (4 Weeks)")
+            st.header("📅 AI-Generated Study Plan")
+            st.caption("A rigorous, day-by-day sequence customized to your exam's syllabus.")
             plan = data.get("study_plan") or []
             if plan:
                 for w in plan:
@@ -174,11 +172,13 @@ def main():
                         st.subheader(f"Week {w.get('week', '?')}: {w.get('focus', 'General Prep')}")
                         tip = w.get("tip")
                         if tip:
-                            st.info(f"💡 **Tip:** {tip}")
+                            st.info(f"💡 **Strategy Tip:** {tip}")
+                        
+                        # Display tasks with attractive markdown
                         for t in w.get("tasks") or []:
-                            st.markdown(f"✅ {t}")
+                            st.markdown(f"✨ {t}")
             else:
-                st.info("No study plan could be generated.")
+                st.info("No study plan could be generated. Try expanding your search.")
 
 
         # --- 4. Resources Tab ---
@@ -189,6 +189,9 @@ def main():
                 for r in resources:
                     with st.container(border=True):
                         st.markdown(f"### {r.get('title', 'Link')}")
+                        desc = r.get("description")
+                        if desc:
+                            st.write(desc)
                         st.link_button("🌐 Open Resource", r.get('url', '#'))
             else:
                 st.info("No external blogs or book resources found.")
@@ -202,8 +205,13 @@ def main():
                 for r in yt_links:
                     with st.container(border=True):
                         st.markdown(f"### {r.get('title', 'YouTube Video')}")
+                        url = r.get('url', '')
                         # Streamlit native video embed
-                        st.video(r.get('url', ''))
+                        try:
+                            st.video(url)
+                        except Exception:
+                            pass
+                        st.link_button("▶️ Open on YouTube", url)
             else:
                 st.info("No specific YouTube playlists were found. Try searching YouTube manually.")
 
