@@ -35,6 +35,10 @@ class StudyPlanAgent:
         # We cap summary to avoid blowing out context windows on fallback LLMs
         syllabus_summary = " ".join([s.get("topic", "") for s in syllabus_items[:50]])[:5000]
         
+        if not syllabus_summary and not important_topics:
+            logger.warning("[StudyPlanAgent] No syllabus or topics found. Skipping study plan generation.")
+            return []
+            
         plan = self.study_service.generate_plan(
             exam_name,
             syllabus_summary=syllabus_summary,

@@ -131,7 +131,7 @@ class ProcessingAgent:
                     break
                     
         # LLM Refinement Phase
-        if self.llm and scraped_syllabus_items:
+        if self.llm and (scraped_syllabus_items or important):
             logger.info("[ProcessingAgent] Refining topics via LLM...")
             try:
                 prompt = ChatPromptTemplate.from_messages([
