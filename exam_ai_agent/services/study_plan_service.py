@@ -123,10 +123,12 @@ class StudyPlanService:
             prompt = ChatPromptTemplate.from_messages([
                 ("system", 
                  "You are an expert exam preparation coach. Generate a {weeks}-week study plan for the exam. "
-                 "CRITICAL INSTRUCTION: You MUST strictly map the weeks to the actual 'Important topics' and 'Syllabus summary' provided by the user. "
-                 "Do not invent generic subjects. Each week MUST explicitly name one or more distinct topics from the provided syllabus in the 'focus'. "
-                 "You MUST reply with a valid JSON array and nothing else. "
-                 'Format: [{"week": 1, "focus": "Actual Topic Name 1 & Actual Topic Name 2", "tasks": ["Study theory for Actual Topic 1", "Solve 50 previous year questions on Actual Topic 2"]}]'),
+                 "CRITICAL INSTRUCTIONS:\n"
+                 "1. You MUST explicitly use the provided 'Important topics' and 'Syllabus summary' to schedule real subjects.\n"
+                 "2. Each week MUST contain a day-wise breakdown (Day 1, Day 2, etc.) or distinct, highly granular task phases.\n"
+                 "3. You MUST include a short practical 'tip' or note for each week's block to guide the student.\n"
+                 "4. You MUST reply with a valid JSON array and absolutely nothing else. Do not output markdown codeblocks.\n"
+                 'Format exactly like this: [{{"week": 1, "focus": "Actual Topic 1 & 2", "tip": "Focus on high-weightage formulas", "tasks": ["Day 1-2: Study theory for Topic 1", "Day 3: Solve 50 MCQs", "Day 4-7: Mock tests"]}}]'),
                 ("human", "Exam: {exam_name}. Syllabus summary: {syllabus}. Important topics: {topics}."),
             ])
             chain = prompt | llm
@@ -155,6 +157,19 @@ class StudyPlanService:
         clean_text = re.sub(r"^```\s*", "", clean_text)
         clean_text = re.sub(r"\s*```$", "", clean_text)
         
+        # Aggressive JSON cleanup for smaller local models
+        try:
+            # Find the first '[' and last ']'
+            start = clean_text.find('[')
+            end = clean_text.rfind(']')
+            if start != -1 and end != -1 and end > start:
+                clean_text = clean_text[start:end+1]
+            elif start != -1:
+                # Missing closing bracket
+                clean_text = clean_text[start:] + "]"
+        except Exception:
+            pass
+            
         try:
             data = json.loads(clean_text)
             if not isinstance(data, list) or len(data) == 0:

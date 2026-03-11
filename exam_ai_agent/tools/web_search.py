@@ -114,26 +114,40 @@ class WebSearchTool:
                 f"{exam_name} paper pattern duration marks",
             ],
             "study_resources": [
-                f"{exam_name} complete course playlist site:youtube.com",
                 f"{exam_name} best reference books preparation strategy",
                 f"{exam_name} free mock test series online",
                 f"{exam_name} NPTEL or Coursera courses",
             ],
+            "youtube_lectures": [
+                f"{exam_name} complete course playlist site:youtube.com",
+                f"{exam_name} exam preparation strategy site:youtube.com",
+                f"{exam_name} best channel for preparation site:youtube.com",
+            ]
         }
         output = {}
         for key, query_list in queries.items():
             merged: List[SearchResult] = []
             for q in query_list:
                 try:
-                    merged.extend(self.search(q, max_results=7))
+                    # Give youtube queries slightly fewer limits per deep dive so it stays fast
+                    limit = 7 if key != "youtube_lectures" else 5
+                    merged.extend(self.search(q, max_results=limit))
                 except Exception as e:
                     logger.warning("Search failed for %s query=%s: %s", key, q, e)
-            # Deduplicate by URL
+            
+            # Deduplicate by URL (exact match)
             seen = set()
             deduped = []
             for r in merged:
                 if not r.url or r.url in seen:
                     continue
+                # For youtube links, perform weak sanitization on watch vs playlist urls 
+                # so we don't grab 5 videos from the exact same channel/playlist if they look identical.
+                base_url = r.url.split('&')[0] if 'youtube' in r.url else r.url
+                if base_url in seen:
+                    continue
+                    
+                seen.add(base_url)
                 seen.add(r.url)
                 deduped.append(r)
             output[key] = deduped[:20]

@@ -1,6 +1,6 @@
 """
 Streamlit Cloud Entry Point for Exam Research AI Agent.
-This version bypasses the FastAPI backend and runs the agent natively for easy hosting.
+Modern UI layout leveraging the orchestrated Multi-Agent system and Supabase caching.
 """
 
 import sys
@@ -11,117 +11,201 @@ import streamlit as st
 # Add the local directory to the Python path so local modules resolve
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# Import the main research agent
+# Import Orchestrator
 from exam_ai_agent.agents.research_agent import ResearchAgent
 
-# Initialize agent once and cache it in session state
+# Initialize Orchestrator agent once and cache it in session state
 if "agent" not in st.session_state:
     st.session_state.agent = ResearchAgent()
 
-def run_research_natively(exam_name: str) -> dict | None:
+# Initialize progress tracking state
+if "progress" not in st.session_state:
+    st.session_state.progress = {}
+
+def run_research_natively(exam_name: str, force: bool = False) -> dict | None:
     """Run the research agent directly in the Streamlit process."""
     try:
-        return st.session_state.agent.research_exam(exam_name)
+        return st.session_state.agent.research_exam(exam_name, force_refresh=force)
     except Exception as e:
         st.error(f"Error during research: {str(e)}")
         return None
 
 def main():
     st.set_page_config(
-        page_title="Exam Research AI Agent",
-        page_icon="📚",
+        page_title="AI Exam Researcher",
+        page_icon="🤖",
         layout="wide",
-    )
-    st.title("📚 Exam Research AI Agent")
-    st.markdown("Enter an exam name to get a **syllabus**, **previous papers**, **study plan**, and **resources**.")
-
-    exam_name = st.text_input(
-        "Exam name",
-        placeholder="e.g. GATE CSE, JEE Main, UPSC CSE",
-        key="exam_name",
+        initial_sidebar_state="collapsed",
     )
     
+    st.title("🤖 AI Exam Research Assistant")
+    st.markdown("Enter an exam name to get a structured **syllabus**, **previous papers**, **study plan**, and **curated resources**.")
+
+    # --- Search Bar & Controls ---
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        exam_name = st.text_input(
+            "Target Exam Name:",
+            placeholder="e.g. GATE CSE, JEE Main, UPSC CSE",
+            key="exam_name",
+        )
+    with col2:
+        st.write("") # Spacer
+        st.write("") # Spacer
+        force_refresh = st.checkbox("Force Fresh Search", help="Bypass database cache and scrape the web again.")
+    
     if not exam_name or not exam_name.strip():
-        st.info("Please enter an exam name to begin.")
+        st.info("👈 Please enter an exam name to begin your preparation journey.")
         return
 
-    # Check if we already have results for this exam
+    # Clear results if exam changes
     if "results" not in st.session_state or st.session_state.get("last_exam") != exam_name:
         st.session_state.results = None
 
-    if st.button("Generate Strategy", type="primary"):
-        with st.spinner(f"Agent is researching {exam_name}... This may take 30-60 seconds..."):
-            res = run_research_natively(exam_name)
+    if st.button("Generate Strategy", type="primary", use_container_width=True):
+        with st.status("🧠 Initializing AI Agents...", expanded=True) as status:
+            st.write("🔎 Agents are scouring the web and consulting the database cache for " + exam_name)
+            res = run_research_natively(exam_name, force=force_refresh)
+            
             if res:
                 st.session_state.results = res
                 st.session_state.last_exam = exam_name
+                status.update(label="✅ Strategy Generated Successfully!", state="complete", expanded=False)
+            else:
+                status.update(label="❌ Failed to generate strategy.", state="error", expanded=True)
 
     data = st.session_state.results
     if data:
-        st.success("Research complete!")
+        st.divider()
         
-        # Syllabus
-        st.subheader("📋 Syllabus Topics")
-        syllabus = data.get("syllabus") or []
-        if syllabus:
-            for s in syllabus:
-                with st.expander(s.get("topic", "Topic")):
-                    st.write(s.get("description", "No details"))
-                    if s.get("source_url"):
-                        st.markdown(f"[Source link]({s.get('source_url')})")
-        else:
-            st.write("No syllabus topics found.")
+        # --- TABS LAYOUT ---
+        tab_syl, tab_pap, tab_plan, tab_res, tab_vid = st.tabs([
+            "📋 Syllabus", 
+            "📄 Previous Papers", 
+            "📅 Study Plan", 
+            "📚 Resources", 
+            "📺 Video Lectures"
+        ])
 
-        # Previous Papers
-        st.subheader("📄 Previous Papers")
-        papers = data.get("previous_papers") or []
-        if papers:
-            for p in papers:
-                st.markdown(f"- [{p.get('title', 'Link')}]({p.get('url', '#')}) ({p.get('type', 'link')})")
-        else:
-            st.write("No previous papers found.")
+        # --- 1. Syllabus Tab ---
+        with tab_syl:
+            st.header("📋 Official Syllabus & Important Topics")
+            
+            # Important topics callout
+            topics = data.get("important_topics") or []
+            if topics:
+                with st.expander("🎯 High-Yield / Important Topics identified by AI", expanded=True):
+                    for t in topics:
+                        st.markdown(f"- **{t}**")
+                        
+            st.divider()
+            
+            # Main syllabus items with progress tracking
+            syllabus = data.get("syllabus") or []
+            if syllabus:
+                for idx, s in enumerate(syllabus):
+                    topic_title = s.get("topic", f"Topic {idx+1}")
+                    
+                    # Progress tracker checkbox logic
+                    cb_key = f"prog_{exam_name}_{topic_title}"
+                    if cb_key not in st.session_state.progress:
+                        st.session_state.progress[cb_key] = False
+                        
+                    colA, colB = st.columns([1, 15])
+                    with colA:
+                        st.session_state.progress[cb_key] = st.checkbox(
+                            f"Complete {topic_title}",
+                            key=cb_key, 
+                            value=st.session_state.progress[cb_key],
+                            label_visibility="hidden"
+                        )
+                        
+                    with colB:
+                        if st.session_state.progress[cb_key]:
+                            st.markdown(f"~~**{topic_title}**~~ (Completed)")
+                        else:
+                            with st.expander(f"**{topic_title}**"):
+                                # Check for hierarchical subtopics first
+                                subtopics = s.get("subtopics", [])
+                                if subtopics:
+                                    st.markdown("#### Subtopics:")
+                                    for sub in subtopics:
+                                        st.markdown(f"- {sub}")
+                                    st.write("")
+                                st.write(s.get("description", "No detailed description available."))
+                                if s.get("source_url"):
+                                    st.markdown(f"[🔗 View Source Material]({s.get('source_url')})")
+            else:
+                st.info("No structured syllabus items could be extracted.")
 
-        # Important Topics
-        st.subheader("🎯 Important Topics")
-        topics = data.get("important_topics") or []
-        if topics:
-            for t in topics:
-                if isinstance(t, str):
-                    st.markdown(f"- {t}")
-                else:
-                    st.write(t)
-        else:
-            st.write("No topics extracted.")
 
-        # Study Plan
-        st.subheader("📅 Study Plan")
-        plan = data.get("study_plan") or []
-        if plan:
-            for w in plan:
-                st.markdown(f"**Week {w.get('week', '')}:** {w.get('focus', '')}")
-                for t in w.get("tasks") or []:
-                    st.markdown(f"- {t}")
-        else:
-            st.write("No study plan generated.")
+        # --- 2. Previous Papers Tab ---
+        with tab_pap:
+            st.header("📄 Previous Year Question Papers")
+            papers = data.get("previous_papers") or []
+            if papers:
+                for p in papers:
+                    with st.container(border=True):
+                        col_text, col_btn = st.columns([4, 1])
+                        with col_text:
+                            st.subheader(p.get('title', 'Unknown Paper'))
+                            if p.get('type') == 'pdf':
+                                st.caption("PDF Document")
+                            else:
+                                st.caption("Web Resource")
+                                
+                        with col_btn:
+                            st.link_button(
+                                "📥 Download PDF" if p.get('type') == 'pdf' else "🔗 Open Link", 
+                                p.get('url', '#'), 
+                                use_container_width=True
+                            )
+            else:
+                st.info("No previous year papers found.")
 
-        # Free Courses & Resources
-        st.subheader("📚 Free Courses & Resources")
+
+        # --- 3. Study Plan Tab ---
+        with tab_plan:
+            st.header("📅 AI-Generated Study Plan (4 Weeks)")
+            plan = data.get("study_plan") or []
+            if plan:
+                for w in plan:
+                    with st.container(border=True):
+                        st.subheader(f"Week {w.get('week', '?')}: {w.get('focus', 'General Prep')}")
+                        tip = w.get("tip")
+                        if tip:
+                            st.info(f"💡 **Tip:** {tip}")
+                        for t in w.get("tasks") or []:
+                            st.markdown(f"✅ {t}")
+            else:
+                st.info("No study plan could be generated.")
+
+
+        # --- 4. Resources Tab ---
         resources = data.get("resources") or []
-        if resources:
-            yt_links = [r for r in resources if "youtube.com" in str(r.get("url", "")).lower() or "youtu.be" in str(r.get("url", "")).lower()]
-            other_links = [r for r in resources if r not in yt_links]
-            
+        with tab_res:
+            st.header("📚 Recommended Books, Courses & Links")
+            if resources:
+                for r in resources:
+                    with st.container(border=True):
+                        st.markdown(f"### {r.get('title', 'Link')}")
+                        st.link_button("🌐 Open Resource", r.get('url', '#'))
+            else:
+                st.info("No external blogs or book resources found.")
+
+
+        # --- 5. Video Lectures Tab ---
+        yt_links = data.get("youtube_lectures") or []
+        with tab_vid:
+            st.header("📺 YouTube Playlists & Video Lectures")
             if yt_links:
-                st.markdown("**📺 YouTube Playlists & Videos:**")
                 for r in yt_links:
-                    st.markdown(f"- [{r.get('title', 'YouTube Link')}]({r.get('url', '#')})")
-            
-            if other_links:
-                st.markdown("**🌐 Websites & Courses:**")
-                for r in other_links:
-                    st.markdown(f"- [{r.get('title', 'Resource Link')}]({r.get('url', '#')})")
-        else:
-            st.write("No additional resources found.")
+                    with st.container(border=True):
+                        st.markdown(f"### {r.get('title', 'YouTube Video')}")
+                        # Streamlit native video embed
+                        st.video(r.get('url', ''))
+            else:
+                st.info("No specific YouTube playlists were found. Try searching YouTube manually.")
 
 if __name__ == "__main__":
     main()

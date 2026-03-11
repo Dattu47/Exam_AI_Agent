@@ -41,20 +41,21 @@ class SyllabusService:
             })
         return items[:15]  # Cap for readability
 
-    def extract_from_html(self, html: str, source_url: str = "") -> List[str]:
+    def extract_from_html(self, html: str, source_url: str = "") -> List[dict]:
         """
         Extract syllabus topics by parsing HTML structure (lists and tables).
+        Returns a hierarchical list of topics with discovered subtopics based on heading vs <li> depth.
         
         Args:
             html: Raw HTML content
             source_url: URL this HTML came from
 
         Returns:
-            List of topic strings
+            List of {"topic": "Topic Name", "subtopics": ["Sub 1", "Sub 2"]}
         """
-        topics: List[str] = []
+        hierarchy: List[dict] = []
         if not html:
-            return topics
+            return hierarchy
 
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html, "html.parser")
@@ -85,9 +86,7 @@ class SyllabusService:
             if len(t) < 5 or len(t) > 200:
                 return False
             low = t.lower()
-            if any(bs in low for bs in bad_substrings):
-                return False
-            if low.strip() in nav_words_exact:
+            if any(bs in low for bs in bad_substrings) or low.strip() in nav_words_exact:
                 return False
             if low.startswith(("http://", "https://")) or "@" in t:
                 return False
@@ -99,97 +98,75 @@ class SyllabusService:
                 return False
             return True
 
-        # Look for <li> items first, they are the most common container for syllabus topics
-        for li in soup.find_all("li"):
-            # Ensure it's not a nav menu item
-            if li.find_parents(["nav", "footer", "header", "aside"]):
+        # Heuristic HTML parsing for hierarchy: Look for headings H2/H3 for topics, and lists for subtopics.
+        current_topic = None
+        
+        # Traverse all relevant elements sequentially
+        for elem in soup.find_all(['h2', 'h3', 'h4', 'li', 'td', 'th']):
+            if elem.find_parents(["nav", "footer", "header", "aside"]):
                 continue
-            text = li.get_text(separator=" ", strip=True)
+                
+            text = elem.get_text(separator=" ", strip=True)
             text = re.sub(r"\s+", " ", text)
-            if _is_valid_topic(text):
-                topics.append(text)
-
-        # If we didn't get much from lists, try looking at table cells (often used for topic -> weightage)
-        if len(topics) < 5:
-            for td in soup.find_all(["td", "th"]):
-                if td.find_parents(["nav", "footer", "header", "aside"]):
-                    continue
-                text = td.get_text(separator=" ", strip=True)
-                text = re.sub(r"\s+", " ", text)
-                if _is_valid_topic(text):
-                    topics.append(text)
+            
+            if not _is_valid_topic(text):
+                continue
+                
+            if elem.name in ['h2', 'h3', 'h4']:
+                current_topic = {"topic": text, "subtopics": []}
+                hierarchy.append(current_topic)
+            elif elem.name in ['li', 'td', 'th']:
+                if current_topic:
+                    if text not in current_topic["subtopics"]:
+                        current_topic["subtopics"].append(text)
+                else:
+                    # If we find list items before a heading, make them their own topic
+                    current_topic = {"topic": text, "subtopics": []}
+                    hierarchy.append(current_topic)
 
         deduped = []
         seen = set()
-        for t in topics:
-            key = t.lower()
-            if key in seen:
+        for section in hierarchy:
+            topic_key = section["topic"].lower()
+            if topic_key in seen:
                 continue
-            seen.add(key)
-            deduped.append(t)
+            seen.add(topic_key)
+            deduped.append(section)
+
+        # Fallback to Text extraction logic if BS4 tags completely fail for this site
+        if len(deduped) < 3:
+            return self.extract_from_text(soup.get_text(separator="\n", strip=True), source_url)
 
         return deduped[:40]
 
-    def extract_from_text(self, text: str, source_url: str = "") -> List[str]:
+    def extract_from_text(self, text: str, source_url: str = "") -> List[dict]:
         """
         Simple rule-based extraction of bullet/topic lines from scraped text.
-        Looks for lines that look like syllabus topics (numbered, bulleted, or short lines).
+        Returns a hierarchical list of topics with discovered subtopics.
 
         Args:
             text: Raw scraped text
             source_url: URL this text came from
 
         Returns:
-            List of topic strings
+            List of {"topic": "Topic Name", "subtopics": ["Sub 1", "Sub 2"]}
         """
-        topics: List[str] = []
+        hierarchy: List[dict] = []
         if not text:
-            return topics
+            return hierarchy
 
         # Common boilerplate/header/navigation lines to ignore across exam sites.
         bad_substrings = (
-            "graduate aptitude test",
-            "organizing institute",
-            "indian institute of technology",
-            "ministry of",
-            "copyright",
-            "all rights reserved",
-            "contact us",
-            "website",
-            "home page",
-            "login",
-            "log in",
-            "sign in",
-            "sign up",
-            "by logging",
-            "register",
-            "application",
-            "brochure",
-            "notification",
-            "important dates",
-            "admit card",
-            "result",
-            "gate 20",
-            "click here",
-            "read more",
-            "see also",
-            "share this",
-            "follow us",
-            "subscribe",
-            "newsletter",
-            "privacy policy",
-            "terms of",
-            "cookie",
-            "advertisement",
-            "sponsored",
-            "related articles",
-            "also read",
-            "get started",
-            "download app",
-            "install app",
+            "graduate aptitude test", "organizing institute", "indian institute of technology",
+            "ministry of", "copyright", "all rights reserved", "contact us", "website",
+            "home page", "login", "log in", "sign in", "sign up", "by logging", "register",
+            "application", "brochure", "notification", "important dates", "admit card",
+            "result", "gate 20", "click here", "read more", "see also", "share this",
+            "follow us", "subscribe", "newsletter", "privacy policy", "terms of", "cookie",
+            "advertisement", "sponsored", "related articles", "also read", "get started",
+            "download app", "install app",
         )
 
-        # Standalone navigation words that appear verbatim as menu items.
         nav_words_exact = {
             "courses", "tutorials", "home", "about", "contact", "menu",
             "navigation", "resources", "blog", "news", "forum", "videos",
@@ -199,56 +176,67 @@ class SyllabusService:
             "previous", "more", "less", "show", "hide", "toggle", "close",
         }
 
+        current_topic = None
+        
         for line in text.split("\n"):
+            original_line = line
             line = line.strip()
             if len(line) < 5 or len(line) > 200:
                 continue
             low = line.lower()
-            if any(bs in low for bs in bad_substrings):
+            if any(bs in low for bs in bad_substrings) or low.strip() in nav_words_exact:
                 continue
-            # Skip exact navigation words (case-insensitive single-word lines)
-            if low.strip() in nav_words_exact:
-                continue
-            # Skip obvious navigation / URLs
             if low.startswith(("http://", "https://")) or "@" in line:
                 continue
-            # Skip lines that are mostly punctuation
             if sum(ch.isalnum() for ch in line) < 4:
                 continue
-            # Skip all-caps banners (common headers)
+            
             letters = [c for c in line if c.isalpha()]
-            if letters and (sum(c.isupper() for c in letters) / max(1, len(letters))) > 0.85 and len(line) > 25:
-                continue
-            # Require at least 2 words to avoid single-word menu items
+            is_all_caps = letters and (sum(c.isupper() for c in letters) / max(1, len(letters))) > 0.85 and len(line) > 15
+            
             words = line.split()
             if len(words) < 2 and len(line) < 20:
                 continue
-            # Numbered or bulleted
-            if re.match(r"^[\d\.\-\*]+\s+\w", line) or line.startswith(("-", "•", "*")):
-                cleaned = re.sub(r"^[\d\.\-\*]+\s*", "", line).strip()
-                if cleaned and len(cleaned.split()) >= 2:
-                    topics.append(cleaned)
-            # Short lines that might be section headers
-            elif line.isprintable() and not line.endswith((":", ".", ",")) and len(line) < 80:
-                # Avoid generic words only
-                if line.lower() not in ("syllabus", "topics", "contents", "section", "exam papers", "papers",
-                                        "previous papers", "study material", "study plan", "free courses",
-                                        "important topics", "exam pattern"):
-                    topics.append(line)
-        # Dedupe while preserving order, and drop very generic single-word items
-        deduped = []
-        seen = set()
-        for t in topics:
-            tt = re.sub(r"\s+", " ", t).strip()
-            if len(tt.split()) == 1 and len(tt) < 6:
-                continue
-            key = tt.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            deduped.append(tt)
 
-        return deduped[:30]
+            cleaned = re.sub(r"^[\d\.\-\*]+\s*", "", line).strip()
+            
+            # Heuristic for hierarchical parsing:
+            # 1. If it's all caps, it's a major topic
+            # 2. If it's indented with spaces/tabs in the original raw line, it's a subtopic
+            # 3. If it starts with a Roman numeral or letter (a., b.), it's a subtopic
+            
+            is_indented = len(original_line) - len(original_line.lstrip()) >= 2
+            is_sub_bullet = re.match(r"^[a-zivx]+\.\s", line.lower())
+            
+            if is_all_caps or (not is_indented and not is_sub_bullet and current_topic is None):
+                # New Major Topic
+                # Filter out generic headers
+                if cleaned.lower() not in ("syllabus", "topics", "contents", "section", "exam papers", "papers", "previous papers", "study material", "study plan", "free courses", "important topics", "exam pattern"):
+                    current_topic = {"topic": cleaned, "subtopics": []}
+                    hierarchy.append(current_topic)
+            else:
+                # Subtopic (or flat topic if we haven't found a major one yet)
+                if cleaned and len(cleaned.split()) >= 2:
+                    if current_topic:
+                        if cleaned not in current_topic["subtopics"]:
+                            current_topic["subtopics"].append(cleaned)
+                    else:
+                        # Treat as standalone topic if no parent exists
+                        if cleaned.lower() not in ("syllabus", "topics", "contents", "section"):
+                            current_topic = {"topic": cleaned, "subtopics": []}
+                            hierarchy.append(current_topic)
+
+        # Merge and deduplicate
+        seen = set()
+        deduped = []
+        for section in hierarchy:
+            topic_key = section["topic"].lower()
+            if topic_key in seen:
+                continue
+            seen.add(topic_key)
+            deduped.append(section)
+
+        return deduped[:20]
 
     def merge_syllabus(
         self,
@@ -266,18 +254,32 @@ class SyllabusService:
 
         def _norm(s: str) -> str:
             return re.sub(r"\s+", " ", (s or "").strip().lower())
+            
+        def _base_url(u: str) -> str:
+            if not u: return ""
+            return u.split('?')[0].split('#')[0].rstrip('/')
 
-        seen = set()
+        seen_topics = set()
+        seen_urls = set()
 
         # Prefer scraped syllabus topics (these contain the real content).
         for item in scraped_items or []:
             topic = (item.get("topic") or "").strip()
             if not topic:
                 continue
+                
             key = _norm(topic)
-            if key in seen:
+            url_base = _base_url(item.get("source_url", ""))
+            
+            # Allow multiple topics from the exact same URL (since 1 page has many topics)
+            # but don't allow the exact same topic text twice
+            if key in seen_topics:
                 continue
-            seen.add(key)
+                
+            seen_topics.add(key)
+            if url_base:
+                seen_urls.add(url_base)
+                
             # Build a meaningful description: prefer an explicit description, otherwise
             # generate one from the topic itself so each entry looks unique.
             raw_desc = (item.get("description") or "").strip()
@@ -285,9 +287,11 @@ class SyllabusService:
                 description = raw_desc[:800]
             else:
                 description = f"{topic} — part of the {exam_name} syllabus. See source link for full details."
+            
             merged.append(
                 {
                     "topic": topic[:200],
+                    "subtopics": item.get("subtopics", []),
                     "source_url": (item.get("source_url") or "").strip(),
                     "description": description[:800],
                 }
@@ -298,13 +302,22 @@ class SyllabusService:
             topic = (item.get("topic") or "").strip()
             if not topic:
                 continue
+                
             key = _norm(topic)
-            if key in seen:
+            url_base = _base_url(item.get("source_url", ""))
+            
+            # For fallback search links, we want to skip if we already have the topic OR the exact link
+            if key in seen_topics or (url_base and url_base in seen_urls):
                 continue
-            seen.add(key)
+                
+            seen_topics.add(key)
+            if url_base:
+                seen_urls.add(url_base)
+                
             merged.append(
                 {
                     "topic": topic[:200],
+                    "subtopics": [],
                     "source_url": (item.get("source_url") or "").strip(),
                     "description": (item.get("description") or "Reference link")[:800],
                 }

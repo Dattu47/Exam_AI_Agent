@@ -33,3 +33,5 @@ python-dotenv>=1.0.0
 # Logging & Async
 aiohttp==3.9.1
 tenacity==8.2.3
+supabase>=2.3.0
+python-dotenv>=1.0.0

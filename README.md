@@ -1,32 +1,130 @@
-# Exam Research AI Agent – Project Root
+# Exam Research AI Agent
 
-This repository contains the **Exam Research AI Agent** package.
+A production-ready AI agent that performs deep web research to collect and organize exam preparation resources for students. Give it an exam name (e.g. **GATE CSE**, **JEE Main**) and it will find syllabus, previous year papers, important topics, a study plan, free courses, and reference links.
 
-## Quick start
+## Features
 
-1. **Create virtual environment and install dependencies**
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate   # Windows
-   pip install -r exam_ai_agent/requirements.txt
-   ```
+- **Deep web research** via DuckDuckGo (no API key required)
+- **Automatic resource collection**: syllabus, papers, exam pattern, study material
+- **AI-generated study plan** (Ollama) with fallback template
+- **Resource categorization** and PDF link detection
+- **FAISS vector store** for storing and searching scraped knowledge
+- **Streamlit web UI** running natively with the agent
+- Modular, logged, and error-handled code
 
-2. **Optional: Install Ollama** for AI-generated study plans  
-   [ollama.ai](https://ollama.ai) → then run `ollama run llama2`
+## Tech Stack
 
-3. **Start the API** (from this folder)
-   ```bash
-   python run_api.py
-   ```
-   Or: `uvicorn exam_ai_agent.api.main:app --reload --port 8000`
+| Component        | Technology              |
+|-----------------|-------------------------|
+| Language        | Python 3.10+            |
+| Agent / LLM     | LangChain + Ollama      |
+| Search          | DuckDuckGo (duckduckgo-search) |
+| Scraping        | BeautifulSoup + Requests |
+| Vector DB       | FAISS                   |
+| UI              | Streamlit               |
 
-4. **Start the Streamlit UI** (in a second terminal)
-   ```bash
-   streamlit run exam_ai_agent/ui/streamlit_app.py
-   ```
+## Project Structure
 
-5. Open the UI in the browser, enter an exam name (e.g. **GATE CSE**), and click **Generate Preparation Plan**.
+```
+├── app.py                  # Main Streamlit UI & entry point
+├── requirements.txt        # Dependencies
+├── .env.example            # Environment variables template
+├── exam_ai_agent/
+│   ├── agents/
+│   │   └── research_agent.py    # Main orchestration agent
+│   ├── tools/
+│   │   ├── web_search.py        # DuckDuckGo search
+│   │   ├── web_scraper.py       # BeautifulSoup scraper
+│   │   └── pdf_downloader.py    # PDF link discovery
+│   ├── services/
+│   │   ├── syllabus_service.py  # Syllabus extraction
+│   │   ├── papers_service.py   # Previous papers aggregation
+│   │   └── study_plan_service.py # Study plan generation (LLM/template)
+│   ├── database/
+│   │   └── vector_store.py     # FAISS vector store
+│   ├── config/
+│   │   └── settings.py         # Configuration
+│   └── utils/
+│       └── logger.py           # Logging
+```
 
----
+## Setup (Run Locally)
 
-Full setup, configuration, and API details: **[exam_ai_agent/README.md](exam_ai_agent/README.md)**.
+### 1. Python environment
+
+Use Python 3.10 or higher. Create and activate a virtual environment:
+
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Optional: Ollama (for AI study plan and embeddings)
+
+- Install [Ollama](https://ollama.ai).
+- Run a chat model, e.g.:
+  ```bash
+  ollama run llama2
+  ```
+- For vector store embeddings (optional):
+  ```bash
+  ollama run nomic-embed-text
+  ```
+
+If Ollama is not running, the app still works: the study plan uses a **template** and the vector store uses a simple fallback.
+
+### 4. Run the App
+
+```bash
+streamlit run app.py
+```
+
+## Usage
+
+1. Open the Streamlit app.
+2. Enter an exam name (e.g. **GATE CSE**, **JEE Main**, **UPSC CSE**).
+3. Click **Generate Strategy**.
+4. View **Syllabus**, **Previous Papers**, **Important Topics**, **Study Plan**, and **Resources**.
+
+### Python (calling the agent directly)
+
+```python
+from exam_ai_agent.agents.research_agent import ResearchAgent
+
+agent = ResearchAgent()
+result = agent.research_exam("GATE CSE")
+
+print(result["syllabus"])
+print(result["previous_papers"])
+print(result["study_plan"])
+```
+
+## Configuration
+
+Environment variables (optional; defaults in `exam_ai_agent/config/settings.py`):
+
+| Variable            | Default                 | Description                    |
+|---------------------|-------------------------|--------------------------------|
+| `LLM_BASE_URL`      | `http://localhost:11434`| Ollama API URL                 |
+| `LLM_MODEL`         | `llama2`                | Ollama model name              |
+| `MAX_SEARCH_RESULTS`| `10`                    | Max DuckDuckGo results per query |
+| `MAX_SCRAPE_PAGES`  | `5`                     | Max pages to scrape per run     |
+| `VECTOR_STORE_PATH` | `exam_ai_agent/data/faiss_index` | FAISS index directory   |
+| `LOG_LEVEL`         | `INFO`                  | Logging level                  |
+
+Create a `.env` in the project root or set these in the environment.
+
+## License
+
+Use and modify as needed for your project.
