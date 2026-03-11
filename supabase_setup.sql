@@ -32,3 +32,8 @@ CREATE TABLE IF NOT EXISTS public.study_plans (
 
 -- Note: The UNIQUE constraints on 'exam_name' in the last two tables 
 -- are required for the agent's "upsert" commands to function properly.
+
+-- 4. Migrations for existing databases
+-- If you created the database before youtube_lectures was added, run this:
+ALTER TABLE IF EXISTS public.exam_resources 
+ADD COLUMN IF NOT EXISTS youtube_lectures JSONB DEFAULT '[]'::jsonb;

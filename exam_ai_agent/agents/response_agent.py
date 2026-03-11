@@ -28,7 +28,8 @@ class ResponseAgent:
             self.llm = ChatGroq(
                 model="llama-3.3-70b-versatile",
                 api_key=api_key,
-                temperature=0.2
+                temperature=0.2,
+                max_tokens=8192
             )
         else:
             logger.warning("[ResponseAgent] Missing GROQ_API_KEY in st.secrets.")
@@ -148,7 +149,7 @@ class ResponseAgent:
                 
                 # Trim result slightly if needed to avoid max context
                 res = chain.invoke({
-                    "data": json.dumps(result)[:25000]
+                    "data": json.dumps(result)
                 })
                 
                 text = res.content.strip()
