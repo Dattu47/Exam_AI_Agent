@@ -57,6 +57,7 @@ class ResponseAgent:
         result = {
             "syllabus": [],
             "previous_papers": [],
+            "important_topics": important_topics,
             "study_plan": study_plan,
             "resources": [],
             "youtube_lectures": []
@@ -138,7 +139,7 @@ class ResponseAgent:
                      "You are an expert strict JSON formatter. \n"
                      "Review the provided JSON data. Apply these STRICT RULES:\n"
                      "1. Remove ANY duplicate URLs globally across all sections.\n"
-                     "2. Ensure exact JSON structure: keys MUST be exactly 'syllabus', 'previous_papers', 'study_plan', 'resources', 'youtube_lectures'.\n"
+                     "2. Ensure exact JSON structure: keys MUST be exactly 'syllabus', 'previous_papers', 'important_topics', 'study_plan', 'resources', 'youtube_lectures'.\n"
                      "3. 'previous_papers' headings MUST match exam year/title (e.g., '2023 Paper').\n"
                      "4. Output ONLY valid JSON, absolutely NO markdown decorators (do NOT wrap in ```json).\n"
                      "5. CRITICAL: Do NOT move items between categories! Any links containing youtube.com MUST stay in 'youtube_lectures', and MUST NOT be moved to 'resources'.\n"

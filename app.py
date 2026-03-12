@@ -8,10 +8,8 @@ import os
 from pathlib import Path
 import streamlit as st
 
-# Add the local directory to the Python path so local modules resolve
-base_dir = str(Path(__file__).resolve().parent)
-if base_dir not in sys.path:
-    sys.path.insert(0, base_dir)
+# Streamlit naturally adds the script's directory to sys.path, so no sys.path hacks are needed.
+
 # Import Orchestrator
 from exam_ai_agent.agents.research_agent import ResearchAgent
 
