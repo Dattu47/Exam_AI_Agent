@@ -106,10 +106,19 @@ class ResearchAgent:
             raw_text_chunks
         )
 
-        # 7. CACHING: Save final compiled results to Supabase (so next user gets it instantly)
-        self.db.save_exam_resources(exam_name, final_response)
-        if study_plan:
-            self.db.save_study_plan(exam_name, study_plan)
+        # 7. CACHING: Only save to Supabase if the result has meaningful content.
+        # Never overwrite good cached data with empty results caused by e.g. Groq rate limits.
+        has_content = (
+            bool(final_response.get("syllabus")) or
+            bool(final_response.get("previous_papers")) or
+            bool(final_response.get("resources"))
+        )
+        if has_content:
+            self.db.save_exam_resources(exam_name, final_response)
+            if study_plan:
+                self.db.save_study_plan(exam_name, study_plan)
+        else:
+            logger.warning("[Orchestrator] Skipping Supabase save — result has no content (likely rate-limited).")
 
         logger.info("[Orchestrator] Finished research pipeline for %s", exam_name)
         return final_response

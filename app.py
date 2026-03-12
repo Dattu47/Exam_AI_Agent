@@ -70,11 +70,22 @@ def main():
                 res = run_research_natively(exam_name, force=force_refresh)
                 
                 if res:
-                    st.session_state.results = res
-                    st.session_state.last_exam = exam_name
-                    status.update(label="✅ Strategy Generated Successfully!", state="complete", expanded=False)
-                else:
-                    status.update(label="❌ Failed to generate strategy.", state="error", expanded=True)
+                    # Only update results if the fresh search actually returned content.
+                    # If Groq rate limits caused empty lists, keep the previous results.
+                    fresh_has_content = (
+                        bool(res.get("syllabus")) or
+                        bool(res.get("previous_papers")) or
+                        bool(res.get("resources")) or
+                        bool(res.get("study_plan"))
+                    )
+                    if fresh_has_content:
+                        st.session_state.results = res
+                        st.session_state.last_exam = exam_name
+                        status.update(label="✅ Strategy Generated Successfully!", state="complete", expanded=False)
+                    else:
+                        # Fresh search returned empty data (e.g. Groq API rate limit hit)
+                        status.update(label="⚠️ Fresh search returned no new data. Showing cached results.", state="complete", expanded=False)
+                        st.warning("⚠️ The AI rate limit was hit during the fresh search. The results shown are from the previous cache. Please try again in a few minutes.")
 
     data = st.session_state.results
     if data:
