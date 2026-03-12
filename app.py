@@ -84,8 +84,16 @@ def main():
                         status.update(label="✅ Strategy Generated Successfully!", state="complete", expanded=False)
                     else:
                         # Fresh search returned empty data (e.g. Groq API rate limit hit)
-                        status.update(label="⚠️ Fresh search returned no new data. Showing cached results.", state="complete", expanded=False)
-                        st.warning("⚠️ The AI rate limit was hit during the fresh search. The results shown are from the previous cache. Please try again in a few minutes.")
+                        status.update(label="⚠️ AI rate limit hit — showing any cached results.", state="complete", expanded=False)
+                        if not st.session_state.get("results"):
+                            st.warning("⚠️ The AI (Groq) token limit was reached. No data could be generated. Please try again in a few minutes, or **uncheck Force Fresh Search** to load previously cached results.")
+                        else:
+                            st.warning("⚠️ The AI token limit was reached during fresh search. Showing previously cached results instead.")
+                else:
+                    # Pipeline returned None — an exception was caught inside run_research_natively
+                    status.update(label="❌ Search failed. Please try again.", state="error", expanded=True)
+                    if not st.session_state.get("results"):
+                        st.error("❌ The research pipeline failed to generate results. Please try again in a moment.")
 
     data = st.session_state.results
     if data:
