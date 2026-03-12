@@ -216,5 +216,6 @@ def main():
             else:
                 st.info("No specific YouTube playlists were found. Try searching YouTube manually.")
 
-if __name__ == "__main__":
-    main()
+# Call main() unconditionally — Streamlit runs this file as a module, NOT as __main__,
+# so `if __name__ == "__main__":` would silently prevent any UI from ever rendering.
+main()
