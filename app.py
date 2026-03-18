@@ -34,8 +34,9 @@ st.markdown("""
 }
 
 .stApp { background: var(--bg-base); color: var(--text-high); font-family: 'Plus Jakarta Sans', sans-serif; }
-header, footer, #MainMenu { visibility: hidden; position: absolute; }
+footer, #MainMenu { visibility: hidden; }
 .stDeployButton { display: none; }
+header { background: transparent !important; }
 
 [data-testid="stSidebar"] {
     background-color: #06080C !important;
