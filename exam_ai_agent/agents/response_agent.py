@@ -141,13 +141,14 @@ class ResponseAgent:
             try:
                 prompt = ChatPromptTemplate.from_messages([
                     ("system", 
-                     "You are an expert strict JSON formatter. \n"
-                     "Review the provided JSON data. Apply these STRICT RULES:\n"
+                     "You are an elite academic strict JSON formatter. \n"
+                     "Review the provided JSON data. Apply these ABSOLUTE RULES:\n"
                      "1. Remove ANY duplicate URLs globally across all sections.\n"
-                     "2. Ensure exact JSON structure: keys MUST be exactly 'syllabus', 'previous_papers', 'important_topics', 'study_plan', 'resources', 'youtube_lectures'.\n"
-                     "3. 'previous_papers' headings MUST match exam year/title (e.g., '2023 Paper').\n"
-                     "4. Output ONLY valid JSON, absolutely NO markdown decorators (do NOT wrap in ```json).\n"
-                     "5. CRITICAL: Do NOT move items between categories! Any links containing youtube.com MUST stay in 'youtube_lectures', and MUST NOT be moved to 'resources'.\n"
+                     "2. Match exactly these keys: 'syllabus', 'previous_papers', 'important_topics', 'study_plan', 'resources', 'youtube_lectures'.\n"
+                     "3. 'previous_papers' titles MUST look like 'Drafting 2023 Paper' or 'Original 2022 Archive'.\n"
+                     "4. Output ONLY valid JSON, absolutely NO markdown decorators.\n"
+                     "5. CATEGORY ISOLATION: Any URL containing 'youtube.com' or 'youtu.be' MUST be in 'youtube_lectures'. REMOVE them from 'resources' or 'previous_papers' if they exist there.\n"
+                     "6. QUALITY CHECK: If a paper link is just a generic homepage, remove it."
                     ),
                     ("human", "{data}")
                 ])

@@ -229,9 +229,7 @@ div.stButton > button:hover {
 # ── 3. Sidebar Navigation ──────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="sidebar-logo">⚡ ExamGenie</div>', unsafe_allow_html=True)
-    st.markdown("---")
-    st.caption("AI-Powered Examination Intelligence")
-    st.caption("v2.4.0 SaaS Edition")
+    pass
 
 # ── 4. Session State & Research Logic ──────────────────────────────────────────
 if "agent" not in st.session_state:
