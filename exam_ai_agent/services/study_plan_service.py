@@ -93,13 +93,14 @@ class StudyPlanService:
             from langchain_core.prompts import ChatPromptTemplate
             prompt = ChatPromptTemplate.from_messages([
                 ("system", 
-                 "You are an expert exam preparation coach. Generate an attractive, highly detailed, and rigorous {weeks}-week study plan for the exam. "
-                 "CRITICAL INSTRUCTIONS:\n"
-                 "1. You MUST explicitly use the exact 'Important topics' and 'Syllabus summary' provided below. Frame the schedule strictly around these real subjects. Do NOT use generic placeholders.\n"
-                 "2. Each week MUST contain a day-wise breakdown (Day 1, Day 2, etc.) or distinct, highly granular task phases covering specific syllabus chapters.\n"
-                 "3. You MUST include a short practical 'tip' or note for each week's block to guide the student on strategy.\n"
-                 "4. You MUST reply with a valid JSON array and absolutely nothing else. Do not output markdown codeblocks.\n"
-                 'Format exactly like this: [{{"week": 1, "focus": "Actual Topic 1 & 2", "tip": "Focus on high-weightage formulas", "tasks": ["Day 1-2: Study theory for Topic 1", "Day 3: Solve 50 MCQs", "Day 4-7: Mock tests"]}}]'),
+                 "You are an expert exam preparation coach. Generate an attractive, highly detailed, and rigorous {weeks}-week study plan for the exam. \n"
+                 "DEEP RESEARCH RULES:\n"
+                 "1. You MUST explicitly use the exact 'Important topics' and 'Syllabus summary' provided below. \n"
+                 "2. EACH WEEK MUST contain a day-wise breakdown (Day 1, Day 2, Day 3, Day 4, Day 5, Day 6, Day 7). \n"
+                 "3. For each day, provide a specific task relevant to the syllabus (e.g., 'Day 1: Solve 50 MCQs on Data Structures').\n"
+                 "4. You MUST include a strategy 'tip' for each week.\n"
+                 "5. You MUST reply with a valid JSON array and absolutely nothing else.\n"
+                 'Format: [{{"week": 1, "focus": "Topic X", "tip": "Note", "tasks": ["Day 1: ...", "Day 2: ...", "Day 7: ..."]}}]'),
                 ("human", "Exam: {exam_name}. Syllabus summary: {syllabus}. Important topics: {topics}."),
             ])
             chain = prompt | llm
@@ -152,7 +153,7 @@ class StudyPlanService:
                     continue
                 week = int(item.get("week", len(plan) + 1))
                 focus = str(item.get("focus", ""))[:200]
-                tasks = [str(t)[:200] for t in item.get("tasks", []) if t][:5]
+                tasks = [str(t)[:200] for t in item.get("tasks", []) if t][:10]
                 if not focus and not tasks:
                     continue
                 if not tasks:

@@ -41,7 +41,12 @@ class StudyPlanAgent:
         """
         logger.info("[StudyPlanAgent] Generating %d-week study plan for %s", weeks, exam_name)
         
-        syllabus_summary = " ".join([s.get("topic", "") for s in syllabus_items[:50]])[:5000]
+        syllabus_summary = ""
+        for s in syllabus_items[:50]:
+            t = s.get("topic", "")
+            subs = ", ".join(s.get("subtopics", []))
+            syllabus_summary += f"{t} ({subs}) | "
+        syllabus_summary = syllabus_summary[:6000]
         
         if not syllabus_summary and not important_topics:
             logger.warning("[StudyPlanAgent] No syllabus or topics found. Skipping study plan generation.")
