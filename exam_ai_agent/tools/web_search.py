@@ -101,6 +101,10 @@ class WebSearchTool:
         """
         # Trimmed to the most effective queries only — quality over quantity
         queries = {
+            "exam_info": [
+                f"{exam_name} exam 2025 notification dates deadline",
+                f"{exam_name} about exam details eligibility",
+            ],
             "syllabus": [
                 f"{exam_name} official syllabus",
                 f"{exam_name} syllabus pdf",
@@ -124,6 +128,7 @@ class WebSearchTool:
         }
 
         limits = {
+            "exam_info": 5,
             "syllabus": 8,
             "previous_papers": 8,
             "exam_pattern": 6,
@@ -133,8 +138,8 @@ class WebSearchTool:
 
         output = {}
 
-        # Run all 5 buckets concurrently
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        # Run all 6 buckets concurrently
+        with ThreadPoolExecutor(max_workers=6) as executor:
             futures = {
                 executor.submit(self._search_bucket, key, qlist, limits.get(key, 7)): key
                 for key, qlist in queries.items()

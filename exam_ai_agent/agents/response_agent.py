@@ -47,6 +47,7 @@ class ResponseAgent:
     def format_final_response(
             self,
             exam_name: str,
+            info_results: List[Any],
             syllabus_results: List[Any],
             papers_results: List[Any],
             study_results: List[Any],
@@ -59,11 +60,11 @@ class ResponseAgent:
         ) -> Dict[str, Any]:
         """
         Builds the final structured dictionary to send back to the UI.
-        Also persists raw text chunks to FAISS vector DB.
         """
         logger.info("[ResponseAgent] Formatting final response for %s", exam_name)
         
         result = {
+            "about_exam": {"description": "", "deadline": "TBA"},
             "syllabus": [],
             "previous_papers": [],
             "important_topics": important_topics,
@@ -71,102 +72,62 @@ class ResponseAgent:
             "resources": [],
             "youtube_lectures": []
         }
-
-        # Step 1: Store in vector database
-        if raw_text_chunks:
-            chunks = []
-            for t in raw_text_chunks:
-                for block in t.split("\n\n"):
-                    if len(block.strip()) > 100:
-                        chunks.append(block.strip())
-            if chunks:
-                self.vector_store.add_texts(chunks, exam_name=exam_name)
-
-        # Step 2: Build syllabus section by merging search snippets with scraped items
-        syllabus_items = self.syllabus_service.extract_from_search_results(syllabus_results)
-        merged_syllabus = self.syllabus_service.merge_syllabus(
-            syllabus_items, scraped_syllabus_items, exam_name
-        )
         
-        def _base(u):
-            return u.split('?')[0].split('#')[0].rstrip('/')
-            
-        existing_syllabus_bases = set()
-        for s in merged_syllabus:
-            url = s.get("source_url")
-            base = _base(url) if url else None
-            
-            if base:
-                if base not in existing_syllabus_bases:
-                    result["syllabus"].append(s)
-                    existing_syllabus_bases.add(base)
-            else:
-                result["syllabus"].append(s)
-
-        # Step 3: Previous papers (search results + hidden PDFs found during scrape)
+        # Step 1: Info extraction
+        info_snippets = [getattr(r, "snippet", "") or r.get("snippet", "") for r in info_results]
+        result["about_exam"]["description"] = " ".join(info_snippets[:3])
+        
+        # Step 2: Syllabus
+        syllabus_items = self.syllabus_service.extract_from_search_results(syllabus_results)
+        result["syllabus"] = self.syllabus_service.merge_syllabus(syllabus_items, scraped_syllabus_items, exam_name)
+        
+        # Step 3: Papers & Resources
         result["previous_papers"] = self.papers_service.from_search_results(papers_results)
         
-        existing_paper_bases = {_base(p["url"]) for p in result["previous_papers"] if p.get("url")}
-        
-        for pdf in hidden_pdfs:
-            url = pdf.get("url")
-            if url:
-                base = _base(url)
-                if base not in existing_paper_bases:
-                    result["previous_papers"].append(pdf)
-                    existing_paper_bases.add(base)
-                    
-        result["previous_papers"] = result["previous_papers"][:25]
-
-        # Step 4: Study resources (free courses, books, NPTEL)
         for r in study_results:
-            url = getattr(r, "url", None) or (r.get("url") or r.get("href") if isinstance(r, dict) else "")
+            url = getattr(r, "url", None) or (r.get("url") if isinstance(r, dict) else "")
             title = getattr(r, "title", None) or (r.get("title") if isinstance(r, dict) else "")
             if url and title:
-                res_type = "pdf" if self.pdf_tool.is_pdf_url(url) else "link"
-                result["resources"].append({"title": title[:300], "url": url, "type": res_type})
-        result["resources"] = result["resources"][:15]
+                result["resources"].append({"title": title, "url": url, "type": "link"})
 
-        # Step 5: YouTube Lectures
         for r in youtube_results:
-            url = getattr(r, "url", None) or (r.get("url") or r.get("href") if isinstance(r, dict) else "")
+            url = getattr(r, "url", None) or (r.get("url") if isinstance(r, dict) else "")
             title = getattr(r, "title", None) or (r.get("title") if isinstance(r, dict) else "")
             if url and title:
-                result["youtube_lectures"].append({"title": title[:300], "url": url, "type": "video"})
-        result["youtube_lectures"] = result["youtube_lectures"][:10]
+                result["youtube_lectures"].append({"title": title, "url": url, "type": "video"})
+        
+        # Step 4: Vector Storage (Optional background processing)
+        if raw_text_chunks and self.vector_store:
+            try:
+                self.vector_store.add_texts(raw_text_chunks[:50], exam_name=exam_name)
+            except: pass
 
-        # Step 6: Final LLM Formatting & Deduplication Check
+        # Step 5: LLM Polish
         if self.llm:
-            logger.info("[ResponseAgent] Validating final payload via LLM...")
             try:
                 prompt = ChatPromptTemplate.from_messages([
                     ("system", 
                      "You are an elite academic strict JSON formatter. \n"
                      "Review the provided JSON data. Apply these ABSOLUTE RULES:\n"
                      "1. Remove ANY duplicate URLs globally across all sections.\n"
-                     "2. Match exactly these keys: 'syllabus', 'previous_papers', 'important_topics', 'study_plan', 'resources', 'youtube_lectures'.\n"
-                     "3. 'previous_papers' titles MUST look like 'Drafting 2023 Paper' or 'Original 2022 Archive'.\n"
-                     "4. Output ONLY valid JSON, absolutely NO markdown decorators.\n"
-                     "5. CATEGORY ISOLATION: Any URL containing 'youtube.com' or 'youtu.be' MUST be in 'youtube_lectures'. REMOVE them from 'resources' or 'previous_papers' if they exist there.\n"
-                     "6. QUALITY CHECK: If a paper link is just a generic homepage, remove it."
+                     "2. Match exactly these keys: 'about_exam', 'syllabus', 'previous_papers', 'important_topics', 'study_plan', 'resources', 'youtube_lectures'.\n"
+                     "3. 'about_exam' MUST contain 'description' (concise summary) and 'deadline' (application date if found, else 'Check Official Notification').\n"
+                     "4. 'syllabus' MUST be an array of objects: {'topic': string, 'subtopics': [strings]}. NO DESCRIPTIONS.\n"
+                     "5. CATEGORY ISOLATION: YouTube strictly in 'youtube_lectures'.\n"
+                     "6. Output ONLY valid JSON, absolutely NO markdown decorators.\n"
                     ),
                     ("human", "{data}")
                 ])
                 chain = prompt | self.llm
-                
-                res = chain.invoke({
-                    "data": json.dumps(result)
-                })
+                res = chain.invoke({"data": json.dumps(result)})
                 
                 text = res.content.strip()
                 if text.startswith("```json"): text = text[7:]
                 if text.startswith("```"): text = text[3:]
                 if text.endswith("```"): text = text[:-3]
-                
-                result = json.loads(text)
-                
+                return json.loads(text)
             except Exception as e:
-                logger.warning(f"[ResponseAgent] Final payload refinement failed: {e}")
-
-        logger.info("[ResponseAgent] Final payload generated successfully.")
+                logger.error(f"[ResponseAgent] Final LLM filter failed: {e}")
+                return result
+        
         return result
