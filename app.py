@@ -170,9 +170,9 @@ if nav == "📂 Study Board":
             with st.expander(f"WEEK {wk.get('week')} — {wk.get('focus')}", expanded=True):
                 tasks = wk.get("tasks") or []
                 for t in tasks:
-                    st.markdown(f"**{t}**")
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;◈ {t}", unsafe_allow_html=True)
                 if wk.get("tip"):
-                    st.info(f"💡 Strategy: {wk.get('tip')}")
+                    st.markdown(f"<br>&nbsp;&nbsp;&nbsp;&nbsp;💡 *Strategy: {wk.get('tip')}*", unsafe_allow_html=True)
     else: st.write("Building schedule...")
 
 elif nav == "📋 Syllabus":
