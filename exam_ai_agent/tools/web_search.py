@@ -102,13 +102,12 @@ class WebSearchTool:
         # Trimmed to the most effective queries only — quality over quantity
         queries = {
             "exam_info": [
-                f"{exam_name} exam 2025 notification dates deadline",
-                f"{exam_name} about exam details eligibility",
+                f"{exam_name} exam 2025 details eligibility application deadline ",
+                f"{exam_name} notification official website details",
             ],
             "syllabus": [
-                f"{exam_name} official syllabus",
-                f"{exam_name} syllabus pdf",
-                f"{exam_name} subject wise topics",
+                f"{exam_name} official syllabus geeksforgeeks",
+                f"{exam_name} full syllabus portal subject notes",
             ],
             "previous_papers": [
                 f"{exam_name} previous year question papers pdf",
