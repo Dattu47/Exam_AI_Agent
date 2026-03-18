@@ -17,326 +17,193 @@ st.set_page_config(
 # ── Global CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── Google Font ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+/* ── Google Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
 
-/* ── Root tokens ── */
+/* ── Design System ── */
 :root {
-    --primary: #6C63FF;
-    --primary-dark: #4B44CC;
-    --secondary: #FF6584;
-    --accent: #43D9AD;
-    --bg-dark: #0F1117;
-    --bg-card: #1A1D2E;
-    --bg-card2: #21253A;
-    --text-primary: #F0F2FF;
-    --text-muted: #8B92B8;
-    --border: rgba(108,99,255,0.25);
-    --glow: 0 0 30px rgba(108,99,255,0.3);
-    --radius: 16px;
-    --transition: 0.25s ease;
+    --bg-main: #06070B;
+    --bg-card: #0F1219;
+    --bg-card-hover: #141822;
+    --primary: #CCFF00;             /* Electric Lime */
+    --primary-glow: rgba(204, 255, 0, 0.15);
+    --secondary: #7000FF;            /* Electric Violet */
+    --text-main: #FFFFFF;
+    --text-sub: #94A3B8;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-bright: rgba(255, 255, 255, 0.15);
+    --radius-lg: 20px;
+    --radius-md: 12px;
+    --transition: cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
 }
 
-/* ── Reset & base ── */
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif !important;
-    background-color: var(--bg-dark) !important;
-    color: var(--text-primary) !important;
+/* ── Global Resets ── */
+.stApp, html, body {
+    background-color: var(--bg-main) !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
 }
 
-/* Hide Streamlit chrome */
+/* Hide Streamlit elements */
 #MainMenu, footer, header { visibility: hidden; }
 .stDeployButton { display: none; }
-.block-container { padding: 2rem 3rem !important; max-width: 1400px; }
+.block-container { padding: 4rem 2rem !important; max-width: 1200px; }
 
-/* ── Hero Section ── */
-.hero-wrapper {
-    background: linear-gradient(135deg, #1A1D2E 0%, #12152B 50%, #1A1D2E 100%);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 2.2rem 2.5rem;
-    margin-bottom: 1.75rem;
-    position: relative;
-    overflow: hidden;
-    box-shadow: var(--glow);
+/* ── Typography ── */
+h1, h2, h3 {
+    font-family: 'Outfit', sans-serif !important;
+    letter-spacing: -0.02em;
 }
-.hero-wrapper::before {
-    content: '';
-    position: absolute;
-    top: -60px; right: -60px;
-    width: 300px; height: 300px;
-    background: radial-gradient(circle, rgba(108,99,255,0.15) 0%, transparent 70%);
-    pointer-events: none;
-}
-.hero-wrapper::after {
-    content: '';
-    position: absolute;
-    bottom: -40px; left: -40px;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(67,217,173,0.1) 0%, transparent 70%);
-    pointer-events: none;
+
+/* ── Hero ── */
+.hero-centered {
+    text-align: center;
+    margin-bottom: 4rem;
 }
 .hero-title {
-    font-family: 'Space Grotesk', sans-serif !important;
-    font-size: 2.6rem;
-    font-weight: 700;
-    line-height: 1.15;
-    margin: 0 0 0.6rem;
-    background: linear-gradient(135deg, #F0F2FF 0%, #A89FFF 55%, #43D9AD 100%);
+    font-size: 4rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #FFF 0%, #AAA 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-clip: text;
 }
 .hero-subtitle {
-    font-size: 1rem;
-    color: var(--text-muted);
+    font-size: 1.25rem;
+    color: var(--text-sub);
+    max-width: 700px;
+    margin: 0 auto;
+    font-weight: 400;
     line-height: 1.6;
-    margin: 0;
 }
 
-/* ── Search bar card ── */
-.search-card {
+/* ── Search Experience ── */
+.search-container {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.75rem 2rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    margin-bottom: 3rem;
 }
 
-/* ── Streamlit input overrides ── */
 .stTextInput > div > div > input {
-    background: rgba(255,255,255,0.05) !important;
-    border: 1.5px solid rgba(108,99,255,0.35) !important;
-    border-radius: 12px !important;
-    color: var(--text-primary) !important;
-    font-size: 1rem !important;
-    padding: 0.8rem 1.2rem !important;
-    transition: border-color var(--transition), box-shadow var(--transition) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    color: #FFF !important;
+    padding: 1rem 1.5rem !important;
+    font-size: 1.1rem !important;
+    height: 60px !important;
+    transition: var(--transition) !important;
 }
 .stTextInput > div > div > input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(108,99,255,0.2) !important;
-    outline: none !important;
-}
-.stTextInput > label {
-    color: var(--text-muted) !important;
-    font-size: 0.85rem !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.3px !important;
+    box-shadow: 0 0 0 1px var(--primary) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* ── Primary button ── */
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
-    color: #fff !important;
+/* ── Buttons ── */
+div.stButton > button:first-child {
+    background: var(--primary) !important;
+    color: #000 !important;
+    height: 60px !important;
     border: none !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
-    font-size: 1rem !important;
-    padding: 0.75rem 2rem !important;
-    letter-spacing: 0.3px !important;
-    box-shadow: 0 4px 20px rgba(108,99,255,0.4) !important;
-    transition: all var(--transition) !important;
-    width: 100% !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: var(--transition) !important;
 }
-.stButton > button[kind="primary"]:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 30px rgba(108,99,255,0.55) !important;
-}
-.stButton > button[kind="primary"]:active {
-    transform: translateY(0) !important;
+div.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--primary-glow) !important;
 }
 
-/* ── Secondary / regular button ── */
-.stButton > button:not([kind="primary"]) {
-    background: transparent !important;
-    color: var(--text-primary) !important;
-    border: 1.5px solid var(--border) !important;
-    border-radius: 10px !important;
-    font-weight: 500 !important;
-    transition: all var(--transition) !important;
-}
-.stButton > button:not([kind="primary"]):hover {
-    border-color: var(--primary) !important;
-    color: var(--primary) !important;
-    background: rgba(108,99,255,0.08) !important;
-}
-
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] {
+/* ── Custom Status Card ── */
+[data-testid="stStatus"] {
     background: var(--bg-card) !important;
-    border-radius: 14px !important;
-    padding: 6px !important;
-    gap: 4px !important;
     border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* ── Results Dashboard ── */
+.stTabs [data-baseweb="tab-list"] {
+    background: transparent !important;
+    gap: 8px !important;
+    margin-bottom: 2rem !important;
 }
 .stTabs [data-baseweb="tab"] {
-    background: transparent !important;
-    color: var(--text-muted) !important;
-    border-radius: 10px !important;
-    padding: 0.55rem 1.1rem !important;
-    font-weight: 500 !important;
-    font-size: 0.9rem !important;
-    transition: all var(--transition) !important;
-    border: none !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--text-sub) !important;
+    padding: 10px 24px !important;
+    font-weight: 600 !important;
+    transition: var(--transition) !important;
 }
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
-    color: #fff !important;
-    box-shadow: 0 2px 12px rgba(108,99,255,0.35) !important;
-}
-.stTabs [data-baseweb="tab-panel"] {
-    padding-top: 1.5rem !important;
+    background: var(--primary) !important;
+    color: #000 !important;
+    border-color: var(--primary) !important;
 }
 
-/* ── Cards (containers with border) ── */
+/* Result Item Cards */
 [data-testid="stVerticalBlockBorderWrapper"] > div {
     background: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    padding: 1.25rem !important;
-    transition: border-color var(--transition), box-shadow var(--transition) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: 2rem !important;
+    transition: var(--transition) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"] > div:hover {
-    border-color: rgba(108,99,255,0.5) !important;
-    box-shadow: 0 4px 20px rgba(108,99,255,0.12) !important;
+    border-color: var(--border-bright) !important;
+    transform: translateY(-4px);
 }
 
-/* ── Expander ── */
-details {
-    background: rgba(255,255,255,0.03) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 0.25rem 0.5rem !important;
+/* Progress Section */
+.prog-container {
+    background: rgba(255,255,255,0.03);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
 }
-summary {
-    color: var(--text-primary) !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-}
-
-/* ── Status widget ── */
-[data-testid="stStatus"] {
-    background: var(--bg-card2) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-}
-
-/* ── Info / warning / error boxes ── */
-.stAlert {
-    border-radius: 12px !important;
-    border: none !important;
-}
-[data-baseweb="notification"] {
-    border-radius: 12px !important;
-}
-
-/* ── Progress ── */
-.topic-done { opacity: 0.5; }
-.topic-done strong { text-decoration: line-through; }
-
-/* ── Checkbox ── */
-.stCheckbox label {
-    color: var(--text-muted) !important;
-    font-size: 0.85rem !important;
-}
-
-/* ── Divider ── */
-hr { border-color: var(--border) !important; }
-
-/* ── Link buttons ── */
-.stLinkButton a {
-    background: rgba(108,99,255,0.12) !important;
-    color: var(--primary) !important;
-    border: 1.5px solid rgba(108,99,255,0.35) !important;
-    border-radius: 10px !important;
-    font-weight: 500 !important;
-    transition: all var(--transition) !important;
-    text-decoration: none !important;
-}
-.stLinkButton a:hover {
-    background: var(--primary) !important;
-    color: #fff !important;
-    border-color: var(--primary) !important;
-}
-
-/* ── Section headers ── */
-.section-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-.section-header h2 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--text-primary);
-}
-
-/* ── Result cards ── */
-.result-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-}
-.badge-pdf { background: rgba(255,101,132,0.15); color: #FF6584; border: 1px solid rgba(255,101,132,0.3); }
-.badge-link { background: rgba(67,217,173,0.15); color: #43D9AD; border: 1px solid rgba(67,217,173,0.3); }
-.badge-video { background: rgba(255,0,0,0.12); color: #ff6b6b; border: 1px solid rgba(255,0,0,0.25); }
-.badge-week { background: rgba(108,99,255,0.15); color: var(--primary); border: 1px solid rgba(108,99,255,0.3); }
-
-/* ── Spinner / Loading overrides ── */
-.stSpinner > div {
-    border-top-color: var(--primary) !important;
-}
-
-/* ── Empty state ── */
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: var(--text-muted);
-}
-.empty-state .icon { font-size: 3rem; margin-bottom: 0.75rem; }
-.empty-state p { font-size: 1rem; }
-
-/* ── Progress ring ── */
-.progress-summary {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: rgba(108,99,255,0.08);
-    border: 1px solid rgba(108,99,255,0.2);
-    border-radius: 12px;
-    padding: 0.9rem 1.25rem;
-    margin-bottom: 1.25rem;
-}
-.progress-summary .bar-wrap {
-    flex: 1;
-    height: 6px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 10px;
+.prog-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
     overflow: hidden;
 }
-.progress-summary .bar-fill {
+.prog-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary), var(--accent));
-    border-radius: 10px;
-    transition: width 0.5s ease;
+    background: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+    transition: width 1s ease-in-out;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.4); border-radius: 10px; }
+/* ── Badges ── */
+.badge {
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.badge-pdf { background: rgba(255, 69, 58, 0.1); color: #FF453A; border: 1px solid rgba(255,69,58,0.2); }
+.badge-video { background: rgba(0, 122, 255, 0.1); color: #0A84FF; border: 1px solid rgba(0,122,255,0.2); }
+.badge-study { background: rgba(50, 215, 75, 0.1); color: #32D74B; border: 1px solid rgba(50,215,75,0.2); }
+
+/* Custom Checkbox */
+.stCheckbox div[data-testid="stMarkdownContainer"] p {
+    color: var(--text-sub) !important;
+    font-size: 0.9rem !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-main); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -438,20 +305,19 @@ def _progress_pct(exam_name: str, total: int) -> int:
     return int((done / total) * 100)
 
 
-# ── Hero Header ────────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="hero-wrapper">
-    <div class="hero-title">🎓 ExamGenie AI</div>
+<div class="hero-centered">
+    <div class="hero-title">ExamGenie AI</div>
     <p class="hero-subtitle">
-        Your AI-powered exam preparation assistant — get a curated syllabus, previous papers,
-        a personalised study plan, and top resources for any competitive exam.
+        Intelligent multi-agent search for competitive examinations. 
+        Curated syllabi, past archives, and personalized strategy boards in real-time.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
 
 # ── Search Panel ──────────────────────────────────────────────────────────────
-st.markdown('<div class="search-card">', unsafe_allow_html=True)
+st.markdown('<div class="search-container">', unsafe_allow_html=True)
 
 col_input, col_opts = st.columns([5, 2])
 with col_input:
@@ -554,10 +420,10 @@ with tab_syl:
     # ── Important topics callout ──
     topics = data.get("important_topics") or []
     if topics:
-        with st.expander("🎯  High-Yield Topics identified by AI", expanded=True):
-            cols = st.columns(3)
-            for i, t in enumerate(topics):
-                cols[i % 3].markdown(f"● **{t}**")
+        st.markdown('<p style="font-weight:700; color:var(--text-sub); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:12px;">🎯 High-Yield Focus Areas</p>', unsafe_allow_html=True)
+        cols = st.columns(3)
+        for i, t in enumerate(topics):
+            cols[i % 3].markdown(f'<div style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; font-weight:600; color:var(--text-main); font-size:0.95rem;">{t}</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -568,16 +434,17 @@ with tab_syl:
 
     if total_topics:
         st.markdown(f"""
-        <div class="progress-summary">
-            <span style="color:var(--text-muted);font-size:0.85rem;white-space:nowrap;">
-                📈 Progress &nbsp; <strong style="color:var(--text-primary)">{pct}%</strong>
-            </span>
-            <div class="bar-wrap">
-                <div class="bar-fill" style="width:{pct}%"></div>
+        <div class="prog-container">
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center;">
+                <span style="color:var(--text-sub); font-size:0.85rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase;">Board Progress</span>
+                <span style="color:var(--primary); font-size:1rem; font-weight:800;">{pct}%</span>
             </div>
-            <span style="color:var(--text-muted);font-size:0.82rem;white-space:nowrap;">
-                {sum(1 for k,v in st.session_state.progress.items() if k.startswith(f"prog_{exam_name.strip()}_") and v)} / {total_topics} done
-            </span>
+            <div class="prog-bar-bg">
+                <div class="prog-bar-fill" style="width: {pct}%;"></div>
+            </div>
+            <div style="margin-top:10px; font-size:0.75rem; color:var(--text-sub); font-weight:500;">
+                {sum(1 for k,v in st.session_state.progress.items() if k.startswith(f"prog_{exam_name.strip()}_") and v)} of {total_topics} topics mastered
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -636,10 +503,10 @@ with tab_pap:
             with st.container(border=True):
                 col_info, col_btn = st.columns([5, 1])
                 with col_info:
-                    badge_cls = "badge-pdf" if p.get("type") == "pdf" else "badge-link"
-                    badge_lbl = "📄 PDF" if p.get("type") == "pdf" else "🌐 Link"
+                    badge_cls = "badge-pdf" if p.get("type") == "pdf" else "badge-video"
+                    badge_lbl = "DOC" if p.get("type") == "pdf" else "WEB"
                     st.markdown(
-                        f'<span class="result-badge {badge_cls}">{badge_lbl}</span>',
+                        f'<span class="badge {badge_cls}">{badge_lbl}</span>',
                         unsafe_allow_html=True,
                     )
                     st.markdown(f"**{p.get('title', 'Untitled Paper')}**")
@@ -678,7 +545,7 @@ with tab_plan:
                 with col_badge:
                     st.markdown(
                         f'<div style="text-align:center;padding-top:4px">'
-                        f'<span class="result-badge badge-week">Wk {week_num}</span>'
+                        f'<span class="badge badge-study">Week {week_num}</span>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
@@ -710,10 +577,10 @@ with tab_res:
             with st.container(border=True):
                 col_text, col_btn = st.columns([5, 1])
                 with col_text:
-                    badge_cls = "badge-pdf" if r.get("type") == "pdf" else "badge-link"
-                    badge_lbl = "📄 PDF" if r.get("type") == "pdf" else "🌐 Web"
+                    badge_cls = "badge-pdf" if r.get("type") == "pdf" else "badge-study"
+                    badge_lbl = "PDF" if r.get("type") == "pdf" else "SOURCE"
                     st.markdown(
-                        f'<span class="result-badge {badge_cls}">{badge_lbl}</span>',
+                        f'<span class="badge {badge_cls}">{badge_lbl}</span>',
                         unsafe_allow_html=True,
                     )
                     st.markdown(f"**{r.get('title', 'Resource')}**")
@@ -744,7 +611,7 @@ with tab_vid:
             with vid_cols[i % 2]:
                 with st.container(border=True):
                     st.markdown(
-                        '<span class="result-badge badge-video">▶ YouTube</span>',
+                        '<span class="badge badge-video">VIDEO</span>',
                         unsafe_allow_html=True,
                     )
                     st.markdown(f"**{r.get('title', 'YouTube Video')}**")
