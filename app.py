@@ -230,14 +230,8 @@ div.stButton > button:hover {
 with st.sidebar:
     st.markdown('<div class="sidebar-logo">⚡ ExamGenie</div>', unsafe_allow_html=True)
     st.markdown("---")
-    st.button("🏠 Home", use_container_width=True, key="side_home")
-    st.button("📦 Saved Strategy", use_container_width=True, key="side_saved")
-    st.button("🕒 History", use_container_width=True, key="side_history")
-    
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    with st.expander("👤 My Account"):
-        st.write("Dattu S")
-        st.caption("Premium Member")
+    st.caption("AI-Powered Examination Intelligence")
+    st.caption("v2.4.0 SaaS Edition")
 
 # ── 4. Session State & Research Logic ──────────────────────────────────────────
 if "agent" not in st.session_state:
@@ -487,8 +481,8 @@ with tab_vid:
                     v_url = v.get('url', '')
                     if "youtube.com" in v_url or "youtu.be" in v_url:
                         st.video(v_url)
-                    else:
-                        st.link_button("Watch on YouTube", v_url)
+                    
+                    st.link_button("▶️ Watch on YouTube", v_url, use_container_width=True)
     else:
         st.write("Searching for curated playlists...")
 
