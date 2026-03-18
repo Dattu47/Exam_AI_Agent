@@ -148,7 +148,6 @@ if not st.session_state.results:
     st.markdown("""
     <div style="text-align:center; padding-top:4rem;">
         <h3 style="color:var(--text-low);">Enter your examination above to start the deep research.</h3>
-        <p>Prioritizing results from GeeksforGeeks and Official Portals.</p>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
@@ -250,9 +249,12 @@ elif nav == "🤖 Exam Chat":
         agent = st.session_state.agent
         context = ""
         try:
-            results = agent.vector_store.search(chat_input, exam_name=exam_name, k=3)
-            context = "\n".join([r.get("text", "") for r in results])
-        except: pass
+            # Use similarity_search with metadata filter
+            results = agent.vector_store.similarity_search(chat_input, k=3, filter_dict={"exam_name": exam_name})
+            context = "\n".join([r.get("content", "") for r in results])
+        except Exception as e:
+            logger.warning(f"Chatbot context search failed: {e}")
+            pass
         
         prompt = f"Using this exam context: {context}\n\nUser Question: {chat_input}\n\nAnswer concisely based ON THE CONTEXT ONLY. If unknown, say so."
         ans = agent.response_agent.llm.invoke(prompt).content
