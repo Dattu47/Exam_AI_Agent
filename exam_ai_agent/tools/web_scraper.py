@@ -1,9 +1,10 @@
 """
 Web scraping tool using BeautifulSoup and Requests.
-Fetches page content and extracts text from HTML for analysis.
+Scrapes pages in parallel threads to avoid sequential blocking waits.
 """
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -19,35 +20,32 @@ logger = get_logger(__name__)
 class WebScraperTool:
     """
     Scrapes web pages and extracts clean text content.
-    Respects timeout and user-agent from settings.
+    Uses thread-parallel fetching to avoid sequential blocking.
     """
 
     def __init__(
         self,
         timeout: Optional[int] = None,
         user_agent: Optional[str] = None,
-        max_content_length: int = 100_000,
+        max_content_length: int = 80_000,
     ):
-        self.timeout = timeout or settings.REQUEST_TIMEOUT
+        # Use a shorter timeout (8s) — slow sites aren't worth waiting for
+        self.timeout = timeout or min(settings.REQUEST_TIMEOUT, 8)
         self.user_agent = user_agent or settings.USER_AGENT
         self.max_content_length = max_content_length
+        # Thread-safe: create a session per instance, headers set once
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": self.user_agent})
+        self.session.headers.update({
+            "User-Agent": self.user_agent,
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        })
 
     def fetch_url(self, url: str) -> Optional[str]:
-        """
-        Fetch raw HTML from a URL.
-
-        Args:
-            url: Full URL to fetch
-
-        Returns:
-            HTML string or None on failure
-        """
+        """Fetch raw HTML from a URL. Returns None on any error."""
         try:
-            resp = self.session.get(url, timeout=self.timeout)
+            resp = self.session.get(url, timeout=self.timeout, allow_redirects=True)
             resp.raise_for_status()
-            # Limit size to avoid huge pages
             content = resp.text
             if len(content) > self.max_content_length:
                 content = content[: self.max_content_length]
@@ -57,66 +55,56 @@ class WebScraperTool:
             return None
 
     def extract_text(self, html: str, url: str = "") -> str:
-        """
-        Extract main text from HTML, strip scripts/styles, normalize whitespace.
-
-        Args:
-            html: Raw HTML string
-            url: Optional base URL for resolving links
-
-        Returns:
-            Cleaned plain text
-        """
+        """Extract clean readable text from HTML."""
         if not html or not html.strip():
             return ""
 
         soup = BeautifulSoup(html, "html.parser")
 
-        # Remove script, style, nav, footer
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
             tag.decompose()
 
         text = soup.get_text(separator="\n")
-        # Normalize whitespace
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         text = "\n".join(lines)
-        # Collapse multiple newlines
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.strip()
 
     def scrape_page(self, url: str) -> Optional[dict]:
-        """
-        Fetch a URL and return extracted text content along with raw HTML.
-
-        Args:
-            url: Full URL to scrape
-
-        Returns:
-            Dict containing 'html' and 'text', or None if fetch failed
-        """
+        """Fetch a URL and return extracted text + raw HTML dict."""
         html = self.fetch_url(url)
         if html is None:
             return None
         return {"html": html, "text": self.extract_text(html, url)}
 
+    def _scrape_one(self, url: str) -> Optional[dict]:
+        """Worker for parallel scraping."""
+        result = self.scrape_page(url)
+        if result:
+            logger.debug("Scraped %s (%d chars)", url, len(result["text"]))
+            return {"url": url, "text": result["text"], "html": result["html"]}
+        return None
+
     def scrape_urls(self, urls: List[str], max_pages: Optional[int] = None) -> List[dict]:
         """
-        Scrape multiple URLs and return list of {url, text} dicts.
-
-        Args:
-            urls: List of URLs to scrape
-            max_pages: Max number of pages to scrape (default from settings)
-
-        Returns:
-            List of {"url": str, "text": str}
+        Scrape multiple URLs IN PARALLEL (thread pool).
+        Returns list of {url, text, html} dicts for successful fetches.
         """
         limit = max_pages or settings.MAX_SCRAPE_PAGES
+        target = urls[:limit]
+
         results = []
-        for i, url in enumerate(urls):
-            if i >= limit:
-                break
-            page_data = self.scrape_page(url)
-            if page_data:
-                results.append({"url": url, "text": page_data["text"], "html": page_data["html"]})
-                logger.debug("Scraped %s (%d chars)", url, len(page_data["text"]))
+        with ThreadPoolExecutor(max_workers=min(len(target), 6)) as executor:
+            futures = {executor.submit(self._scrape_one, url): url for url in target}
+            for future in as_completed(futures, timeout=30):
+                try:
+                    data = future.result(timeout=12)
+                    if data:
+                        results.append(data)
+                except Exception as e:
+                    logger.warning("Scrape future failed for %s: %s", futures[future], e)
+
+        # Preserve original URL order for consistent processing
+        url_order = {url: i for i, url in enumerate(target)}
+        results.sort(key=lambda x: url_order.get(x["url"], 999))
         return results

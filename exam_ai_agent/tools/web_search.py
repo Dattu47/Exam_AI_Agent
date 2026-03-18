@@ -1,8 +1,10 @@
 """
 Web search tool using DuckDuckGo.
-Searches the internet for exam-related queries without API keys.
+Uses parallel threads to run all search buckets concurrently for fast results.
 """
 
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -15,7 +17,6 @@ logger = get_logger(__name__)
 @dataclass
 class SearchResult:
     """Single search result with title, URL, and snippet."""
-
     title: str
     url: str
     snippet: str
@@ -23,31 +24,20 @@ class SearchResult:
 
 class WebSearchTool:
     """
-    DuckDuckGo search wrapper for finding exam resources.
-    No API key required - uses ddgs library.
+    DuckDuckGo search wrapper. Runs multi-bucket searches in parallel threads.
+    No API key required — uses ddgs library.
     """
 
     def __init__(self, max_results: Optional[int] = None):
         self.max_results = max_results or settings.MAX_SEARCH_RESULTS
 
     def search(self, query: str, max_results: Optional[int] = None) -> List[SearchResult]:
-        """
-        Perform a web search and return structured results.
-
-        Args:
-            query: Search query string (e.g., "GATE CSE syllabus 2024")
-            max_results: Override default max results per query
-
-        Returns:
-            List of SearchResult objects (title, url, snippet)
-        """
+        """Perform a single web search and return structured results."""
         limit = max_results or self.max_results
         results: List[SearchResult] = []
 
         try:
-            # `duckduckgo-search` is deprecated/renamed; `ddgs` is the maintained package.
             from ddgs import DDGS
-
             ddgs = DDGS()
             raw = ddgs.text(
                 query,
@@ -57,98 +47,106 @@ class WebSearchTool:
                 timelimit=None,
             )
             for r in raw or []:
-                results.append(
-                    SearchResult(
-                        title=(r.get("title") or "").strip(),
-                        url=(r.get("href") or r.get("link") or r.get("url") or "").strip(),
-                        snippet=(r.get("body") or r.get("snippet") or "").strip(),
-                    )
-                )
+                results.append(SearchResult(
+                    title=(r.get("title") or "").strip(),
+                    url=(r.get("href") or r.get("link") or r.get("url") or "").strip(),
+                    snippet=(r.get("body") or r.get("snippet") or "").strip(),
+                ))
 
-            # Some environments intermittently return 0 results; retry once with a simpler query.
+            # Retry once with a simpler query if empty
             if not results and ("official" in query.lower() or "pdf" in query.lower()):
                 retry_query = query.replace("official", "").replace("PDF", "").strip()
                 raw2 = ddgs.text(retry_query, max_results=limit, region="in-en", safesearch="moderate")
                 for r in raw2 or []:
-                    results.append(
-                        SearchResult(
-                            title=(r.get("title") or "").strip(),
-                            url=(r.get("href") or r.get("link") or r.get("url") or "").strip(),
-                            snippet=(r.get("body") or r.get("snippet") or "").strip(),
-                        )
-                    )
+                    results.append(SearchResult(
+                        title=(r.get("title") or "").strip(),
+                        url=(r.get("href") or r.get("link") or r.get("url") or "").strip(),
+                        snippet=(r.get("body") or r.get("snippet") or "").strip(),
+                    ))
 
-            logger.info("Search completed: query=%s, results=%d", query, len(results))
+            logger.info("Search '%s' → %d results", query[:60], len(results))
         except Exception as e:
-            logger.exception("Web search failed for query=%s: %s", query, e)
-            raise
+            logger.warning("Search failed for '%s': %s", query[:60], e)
 
         return results
 
+    def _search_bucket(self, key: str, query_list: List[str], limit: int) -> tuple:
+        """Run all queries for one bucket and return deduplicated results."""
+        merged: List[SearchResult] = []
+        for q in query_list:
+            try:
+                merged.extend(self.search(q, max_results=limit))
+                time.sleep(0.3)   # small polite delay between queries in same bucket
+            except Exception as e:
+                logger.warning("Bucket '%s' query failed: %s", key, e)
+
+        seen = set()
+        deduped = []
+        for r in merged:
+            if not r.url:
+                continue
+            base_url = r.url.split("&")[0] if "youtube" in r.url else r.url
+            if base_url in seen:
+                continue
+            seen.add(base_url)
+            seen.add(r.url)
+            deduped.append(r)
+
+        return key, deduped[:20]
+
     def search_exam_resources(self, exam_name: str) -> dict:
         """
-        Run multiple targeted searches for an exam and return grouped results.
-
-        Args:
-            exam_name: Name of the exam (e.g., "GATE CSE", "JEE Main")
-
-        Returns:
-            Dict with keys: syllabus, previous_papers, exam_pattern, study_resources
+        Run all search buckets IN PARALLEL (via threads) for maximum speed.
+        Returns grouped dict: syllabus, previous_papers, exam_pattern, study_resources, youtube_lectures.
         """
-        # Multiple query variants per bucket improves recall.
+        # Trimmed to the most effective queries only — quality over quantity
         queries = {
             "syllabus": [
-                f"{exam_name} syllabus official",
+                f"{exam_name} official syllabus",
                 f"{exam_name} syllabus pdf",
-                f"{exam_name} subject-wise syllabus",
-                f"{exam_name} syllabus pdf site:.ac.in",
-                f"{exam_name} syllabus pdf site:gate2025.iitr.ac.in OR site:gate2024.iisc.ac.in OR site:gate.iitk.ac.in",
+                f"{exam_name} subject wise topics",
             ],
             "previous_papers": [
                 f"{exam_name} previous year question papers pdf",
-                f"{exam_name} question paper pdf filetype:pdf",
-                f"{exam_name} previous year papers site:.ac.in pdf",
+                f"{exam_name} past papers download",
             ],
             "exam_pattern": [
                 f"{exam_name} exam pattern marking scheme",
-                f"{exam_name} paper pattern duration marks",
             ],
             "study_resources": [
-                f"{exam_name} best reference books preparation strategy",
-                f"{exam_name} free mock test series online",
-                f"{exam_name} NPTEL or Coursera courses",
+                f"{exam_name} best books preparation guide",
+                f"{exam_name} free study material NPTEL Coursera",
             ],
             "youtube_lectures": [
-                f"{exam_name} complete course playlist site:youtube.com",
-                f"{exam_name} exam preparation strategy site:youtube.com",
-                f"{exam_name} best channel for preparation site:youtube.com",
-            ]
+                f"{exam_name} full course playlist youtube",
+                f"{exam_name} preparation video lectures youtube",
+            ],
         }
+
+        limits = {
+            "syllabus": 8,
+            "previous_papers": 8,
+            "exam_pattern": 6,
+            "study_resources": 7,
+            "youtube_lectures": 5,
+        }
+
         output = {}
-        for key, query_list in queries.items():
-            merged: List[SearchResult] = []
-            for q in query_list:
+
+        # Run all 5 buckets concurrently
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(self._search_bucket, key, qlist, limits.get(key, 7)): key
+                for key, qlist in queries.items()
+            }
+            for future in as_completed(futures):
                 try:
-                    # Give youtube queries slightly fewer limits per deep dive so it stays fast
-                    limit = 7 if key != "youtube_lectures" else 5
-                    merged.extend(self.search(q, max_results=limit))
+                    key, results = future.result(timeout=60)
+                    output[key] = results
+                    logger.info("Bucket '%s' completed with %d results", key, len(results))
                 except Exception as e:
-                    logger.warning("Search failed for %s query=%s: %s", key, q, e)
-            
-            # Deduplicate by URL (exact match)
-            seen = set()
-            deduped = []
-            for r in merged:
-                if not r.url or r.url in seen:
-                    continue
-                # For youtube links, perform weak sanitization on watch vs playlist urls 
-                # so we don't grab 5 videos from the exact same channel/playlist if they look identical.
-                base_url = r.url.split('&')[0] if 'youtube' in r.url else r.url
-                if base_url in seen:
-                    continue
-                    
-                seen.add(base_url)
-                seen.add(r.url)
-                deduped.append(r)
-            output[key] = deduped[:20]
+                    key = futures[future]
+                    logger.warning("Bucket '%s' future failed: %s", key, e)
+                    output[key] = []
+
         return output

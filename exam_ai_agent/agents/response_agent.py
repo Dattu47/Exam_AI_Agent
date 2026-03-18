@@ -2,9 +2,9 @@
 Response Agent: Formats the final results and coordinates the vector store persistence.
 """
 
+import os
 import json
 from typing import List, Dict, Any
-import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from exam_ai_agent.database.vector_store import VectorStore
@@ -16,6 +16,15 @@ from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+def _get_groq_api_key() -> str:
+    """Retrieve Groq API key from Streamlit secrets or environment."""
+    try:
+        import streamlit as st
+        return st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
+    except Exception:
+        return os.environ.get("GROQ_API_KEY", "")
+
+
 class ResponseAgent:
     def __init__(self, vector_store: VectorStore = None, syllabus_service: SyllabusService = None, papers_service: PapersService = None):
         self.vector_store = vector_store or VectorStore()
@@ -23,7 +32,7 @@ class ResponseAgent:
         self.pdf_tool = PDFDownloaderTool(WebScraperTool())
         self.papers_service = papers_service or PapersService(self.pdf_tool)
         
-        api_key = st.secrets.get("GROQ_API_KEY", "")
+        api_key = _get_groq_api_key()
         if api_key:
             self.llm = ChatGroq(
                 model="llama-3.3-70b-versatile",
@@ -32,7 +41,7 @@ class ResponseAgent:
                 max_tokens=8192
             )
         else:
-            logger.warning("[ResponseAgent] Missing GROQ_API_KEY in st.secrets.")
+            logger.warning("[ResponseAgent] Missing GROQ_API_KEY.")
             self.llm = None
 
     def format_final_response(
@@ -50,7 +59,7 @@ class ResponseAgent:
         ) -> Dict[str, Any]:
         """
         Builds the final structured dictionary to send back to the UI.
-        Also persists raw text chunks to FAISS vector DB asynchronously.
+        Also persists raw text chunks to FAISS vector DB.
         """
         logger.info("[ResponseAgent] Formatting final response for %s", exam_name)
         
@@ -65,7 +74,6 @@ class ResponseAgent:
 
         # Step 1: Store in vector database
         if raw_text_chunks:
-            # Chunk roughly by paragraphs
             chunks = []
             for t in raw_text_chunks:
                 for block in t.split("\n\n"):
@@ -98,9 +106,6 @@ class ResponseAgent:
         # Step 3: Previous papers (search results + hidden PDFs found during scrape)
         result["previous_papers"] = self.papers_service.from_search_results(papers_results)
         
-        def _base(u):
-            return u.split('?')[0].split('#')[0].rstrip('/')
-            
         existing_paper_bases = {_base(p["url"]) for p in result["previous_papers"] if p.get("url")}
         
         for pdf in hidden_pdfs:
@@ -148,7 +153,6 @@ class ResponseAgent:
                 ])
                 chain = prompt | self.llm
                 
-                # Trim result slightly if needed to avoid max context
                 res = chain.invoke({
                     "data": json.dumps(result)
                 })
