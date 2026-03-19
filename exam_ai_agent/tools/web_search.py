@@ -1,6 +1,6 @@
 """
-Web search tool using DuckDuckGo.
-Uses parallel threads to run all search buckets concurrently for fast results.
+Web Search Tool — DuckDuckGo powered, multi-bucket parallel search.
+Targets authoritative educational sources for accurate, deduplicated results.
 """
 
 import time
@@ -25,7 +25,6 @@ class SearchResult:
 class WebSearchTool:
     """
     DuckDuckGo search wrapper. Runs multi-bucket searches in parallel threads.
-    No API key required — uses ddgs library.
     """
 
     def __init__(self, max_results: Optional[int] = None):
@@ -53,17 +52,6 @@ class WebSearchTool:
                     snippet=(r.get("body") or r.get("snippet") or "").strip(),
                 ))
 
-            # Retry once with a simpler query if empty
-            if not results and ("official" in query.lower() or "pdf" in query.lower()):
-                retry_query = query.replace("official", "").replace("PDF", "").strip()
-                raw2 = ddgs.text(retry_query, max_results=limit, region="in-en", safesearch="moderate")
-                for r in raw2 or []:
-                    results.append(SearchResult(
-                        title=(r.get("title") or "").strip(),
-                        url=(r.get("href") or r.get("link") or r.get("url") or "").strip(),
-                        snippet=(r.get("body") or r.get("snippet") or "").strip(),
-                    ))
-
             logger.info("Search '%s' → %d results", query[:60], len(results))
         except Exception as e:
             logger.warning("Search failed for '%s': %s", query[:60], e)
@@ -73,71 +61,73 @@ class WebSearchTool:
     def _search_bucket(self, key: str, query_list: List[str], limit: int) -> tuple:
         """Run all queries for one bucket and return deduplicated results."""
         merged: List[SearchResult] = []
+        seen_bases = set()
+
         for q in query_list:
             try:
-                merged.extend(self.search(q, max_results=limit))
-                time.sleep(0.3)   # small polite delay between queries in same bucket
+                hits = self.search(q, max_results=limit)
+                for r in hits:
+                    if not r.url:
+                        continue
+                    base = r.url.split("?")[0].split("#")[0].rstrip("/")
+                    # For YouTube, use the video ID as dedup key
+                    if "youtube.com/watch" in r.url or "youtu.be" in r.url:
+                        base = r.url.split("&")[0]
+                    if base not in seen_bases:
+                        seen_bases.add(base)
+                        merged.append(r)
+                time.sleep(0.4)
             except Exception as e:
-                logger.warning("Bucket '%s' query failed: %s", key, e)
+                logger.warning("Bucket '%s' query '%s' failed: %s", key, q, e)
 
-        seen = set()
-        deduped = []
-        for r in merged:
-            if not r.url:
-                continue
-            base_url = r.url.split("&")[0] if "youtube" in r.url else r.url
-            if base_url in seen:
-                continue
-            seen.add(base_url)
-            seen.add(r.url)
-            deduped.append(r)
-
-        return key, deduped[:20]
+        return key, merged[:20]
 
     def search_exam_resources(self, exam_name: str) -> dict:
         """
-        Run all search buckets IN PARALLEL (via threads) for maximum speed.
-        Returns grouped dict: syllabus, previous_papers, exam_pattern, study_resources, youtube_lectures.
+        Run all search buckets IN PARALLEL for maximum speed.
+        Returns grouped dict of results per category.
         """
-        # Trimmed to the most effective queries only — quality over quantity
+        en = exam_name  # shorthand
+
         queries = {
             "exam_info": [
-                f"{exam_name} exam 2025 details eligibility application deadline ",
-                f"{exam_name} notification official website details",
+                f"{en} exam eligibility syllabus pattern details 2025",
+                f"{en} official notification exam overview site:geeksforgeeks.org OR site:shiksha.com OR site:collegedunia.com",
             ],
             "syllabus": [
-                f"{exam_name} official syllabus geeksforgeeks",
-                f"{exam_name} full syllabus portal subject notes",
+                f"{en} syllabus 2025 topics chapters site:geeksforgeeks.org",
+                f"{en} complete syllabus subject-wise official",
+                f"{en} syllabus PDF official website",
             ],
             "previous_papers": [
-                f"{exam_name} previous year question papers pdf",
-                f"{exam_name} past papers download",
+                f"{en} previous year question papers PDF download",
+                f"{en} past PYQ papers free download",
+                f"{en} solved papers last 5 years",
             ],
             "exam_pattern": [
-                f"{exam_name} exam pattern marking scheme",
+                f"{en} exam pattern marks scheme sections",
             ],
             "study_resources": [
-                f"{exam_name} best books preparation guide",
-                f"{exam_name} free study material NPTEL Coursera",
+                f"{en} best books preparation guide recommended",
+                f"{en} free study material notes PDF NPTEL Coursera",
             ],
             "youtube_lectures": [
-                f"{exam_name} full course playlist youtube",
-                f"{exam_name} preparation video lectures youtube",
+                f"{en} complete preparation playlist site:youtube.com",
+                f"{en} exam preparation lectures youtube 2025",
             ],
         }
 
         limits = {
             "exam_info": 5,
             "syllabus": 8,
-            "previous_papers": 8,
-            "exam_pattern": 6,
-            "study_resources": 7,
-            "youtube_lectures": 5,
+            "previous_papers": 10,
+            "exam_pattern": 5,
+            "study_resources": 8,
+            "youtube_lectures": 8,
         }
 
         output = {}
 
-        # Run all 6 buckets concurrently
         with ThreadPoolExecutor(max_workers=6) as executor:
             futures = {
                 executor.submit(self._search_bucket, key, qlist, limits.get(key, 7)): key
@@ -147,7 +137,7 @@ class WebSearchTool:
                 try:
                     key, results = future.result(timeout=60)
                     output[key] = results
-                    logger.info("Bucket '%s' completed with %d results", key, len(results))
+                    logger.info("Bucket '%s' → %d results", key, len(results))
                 except Exception as e:
                     key = futures[future]
                     logger.warning("Bucket '%s' future failed: %s", key, e)
