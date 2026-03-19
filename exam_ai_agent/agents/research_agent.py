@@ -30,6 +30,7 @@ class ResearchAgent:
         self.processing_agent = ProcessingAgent()
         self.study_agent = StudyPlanAgent()
         self.response_agent = ResponseAgent()
+        self.vector_store = self.response_agent.vector_store  # expose for chatbot
         
         # Initialize Supabase
         self.db = SupabaseService()
@@ -76,6 +77,7 @@ class ResearchAgent:
         pattern_results = search_grouped.get("exam_pattern", [])
         study_results = search_grouped.get("study_resources", [])
         youtube_results = search_grouped.get("youtube_lectures", [])
+        info_results = search_grouped.get("exam_info", [])
 
         # Gather target URLs
         syllabus_urls = [(r.url if hasattr(r, "url") else r.get("url", "")) for r in syllabus_results[:10]]
@@ -95,6 +97,7 @@ class ResearchAgent:
         # 6. RESPONSE AGENT
         final_response = self.response_agent.format_final_response(
             exam_name,
+            info_results,
             syllabus_results,
             papers_results,
             study_results,

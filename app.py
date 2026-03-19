@@ -7,6 +7,8 @@ import streamlit as st
 import datetime
 import json
 from exam_ai_agent.agents.research_agent import ResearchAgent
+from exam_ai_agent.utils.logger import get_logger
+logger = get_logger(__name__)
 
 # ── 1. Page Config ───────────────────────────────────────────────────────────
 st.set_page_config(
@@ -231,35 +233,73 @@ elif nav == "🎬 Video Lab":
                 st.link_button("▶️ Watch", url, use_container_width=True)
 
 elif nav == "🤖 Exam Chat":
-    st.markdown(f"### 🤖 {exam_name} Intelligence Bot")
-    st.caption("Ask questions about exams, dates, or study tactics.")
+    st.markdown(f"### 🤖 {exam_name} AI Expert Bot")
+    st.caption("Powered by AI — Ask about syllabus, dates, strategy, or anything about this exam.")
     
-    if "chat_history" not in st.session_state or not st.session_state.chat_history:
-        st.session_state.chat_history = [{"role": "assistant", "content": f"Hi! I'm your {exam_name} expert. Ask me about the syllabus, important dates, or how to prepare."}]
+    # Initialize per-exam chat history
+    chat_key = f"chat_{exam_name}"
+    if chat_key not in st.session_state:
+        st.session_state[chat_key] = [
+            {"role": "assistant", "content": f"👋 Hi! I'm your **{exam_name}** expert. Ask me anything — syllabus topics, important dates, preparation strategy, or exam pattern."}
+        ]
     
-    for msg in st.session_state.chat_history:
+    for msg in st.session_state[chat_key]:
         with st.chat_message(msg["role"]): st.write(msg["content"])
         
-    chat_input = st.chat_input("How do I prepare for...?")
+    chat_input = st.chat_input(f"Ask about {exam_name}...")
     if chat_input:
-        st.session_state.chat_history.append({"role": "user", "content": chat_input})
+        st.session_state[chat_key].append({"role": "user", "content": chat_input})
         with st.chat_message("user"): st.write(chat_input)
         
-        # RAG Implementation
         agent = st.session_state.agent
-        context = ""
+        
+        # Build rich context from already-fetched exam data (RAG from session)
+        syllabus_str = "\n".join([f"- {s.get('topic')}: {', '.join(s.get('subtopics', []))}" for s in (data.get('syllabus') or [])])
+        topics_str = ", ".join(data.get('important_topics') or [])
+        about_str = (data.get('about_exam') or {}).get('description', '')
+        deadline_str = (data.get('about_exam') or {}).get('deadline', '')
+        plan_str = ""
+        for w in (data.get('study_plan') or []):
+            plan_str += f"Week {w.get('week')}: {w.get('focus')}\n"
+            for t in (w.get('tasks') or []): plan_str += f"  - {t}\n"
+        
+        # Also try FAISS vector search for extra context
+        vs_context = ""
         try:
-            # Use similarity_search with metadata filter
-            results = agent.vector_store.similarity_search(chat_input, k=3, filter_dict={"exam_name": exam_name})
-            context = "\n".join([r.get("content", "") for r in results])
+            vs_results = agent.response_agent.vector_store.similarity_search(
+                chat_input, k=3, filter_dict={"exam_name": exam_name}
+            )
+            vs_context = "\n".join([r.get("content", "") for r in vs_results])
         except Exception as e:
-            logger.warning(f"Chatbot context search failed: {e}")
-            pass
+            logger.warning(f"Vector search: {e}")
         
-        prompt = f"Using this exam context: {context}\n\nUser Question: {chat_input}\n\nAnswer concisely based ON THE CONTEXT ONLY. If unknown, say so."
-        ans = agent.response_agent.llm.invoke(prompt).content
+        full_context = f"""
+Exam: {exam_name}
+About: {about_str}
+Deadline: {deadline_str}
+Key Topics: {topics_str}
+Syllabus:\n{syllabus_str}
+Study Plan:\n{plan_str}
+Additional Research:\n{vs_context}
+"""
+        prompt = f"""You are an expert on {exam_name}. Use ONLY the information below to answer the user question accurately. Be concise, professional, and specific.
+
+EXAM DATA:
+{full_context}
+
+USER QUESTION: {chat_input}
+
+ANSWER:"""
         
-        st.session_state.chat_history.append({"role": "assistant", "content": ans})
+        try:
+            llm = agent.response_agent.llm
+            if llm is None:
+                raise ValueError("LLM not initialized")
+            ans = llm.invoke(prompt).content
+        except Exception as e:
+            ans = f"⚠️ Chatbot unavailable: {e}. Please verify GROQ_API_KEY in secrets."
+        
+        st.session_state[chat_key].append({"role": "assistant", "content": ans})
         with st.chat_message("assistant"): st.write(ans)
 
 st.markdown("<br><br><br>", unsafe_allow_html=True)
