@@ -90,27 +90,29 @@ class StudyPlanService:
             return self._template_plan(exam_name, important_topics)
 
         try:
+            import datetime as _dt
+            year = _dt.datetime.now().year
             from langchain_core.prompts import ChatPromptTemplate
             prompt = ChatPromptTemplate.from_messages([
-                ("system", 
-                 "You are an expert exam preparation coach. Generate an attractive, highly detailed, and rigorous {weeks}-week study plan for the exam. \n"
-                 "DEEP RESEARCH RULES:\n"
-                 "1. You MUST explicitly use the exact 'Important topics' and 'Syllabus summary' provided below. \n"
-                 "2. EACH WEEK MUST contain a day-wise breakdown (Day 1, Day 2, Day 3, Day 4, Day 5, Day 6, Day 7). \n"
-                 "3. For each day, provide a specific task relevant to the syllabus (e.g., 'Day 1: Solve 50 MCQs on Data Structures').\n"
-                 "4. You MUST include a strategy 'tip' for each week.\n"
-                 "5. You MUST reply with a valid JSON array and absolutely nothing else.\n"
-                 'Format: [{{"week": 1, "focus": "Topic X", "tip": "Note", "tasks": ["Day 1: ...", "Day 2: ...", "Day 7: ..."]}}]'),
-                ("human", "Exam: {exam_name}. Syllabus summary: {syllabus}. Important topics: {topics}."),
+                ("system",
+                 f"You are an expert {exam_name} preparation coach for {year}.\n"
+                 "Generate a STRICT 4-week, DAY-WISE study plan using ONLY the syllabus topics provided.\n"
+                 "RULES:\n"
+                 "1. EACH WEEK has exactly 7 daily tasks (Day 1 through Day 7).\n"
+                 "2. Every day's task MUST name a specific topic from the provided syllabus (e.g. 'Day 1: Study Arrays and Linked Lists').\n"
+                 "3. Distribute ALL major syllabus topics across the 4 weeks — cover everything.\n"
+                 "4. Each week has a 'focus' (the main subject area for that week) and a 'tip' (one concise strategy tip).\n"
+                 "5. OUTPUT ONLY a valid JSON array. No markdown, no explanation.\n"
+                 'Format: [{"week":1,"focus":"Subject Area","tip":"Strategy tip","tasks":["Day 1: Task","Day 2: Task",...,"Day 7: Task"]}]'
+                ),
+                ("human", "Exam: {exam_name}\nSyllabus:\n{syllabus}\nKey Topics: {topics}"),
             ])
             chain = prompt | llm
-            syllabus = syllabus_summary or "General syllabus"
-            topics = ", ".join(important_topics[:50]) if important_topics else "All syllabus topics"
+            topics_str = "\n".join([f"- {t}" for t in (important_topics or [])[:40]])
             response = chain.invoke({
                 "exam_name": exam_name,
-                "syllabus": syllabus[:5000],
-                "topics": topics[:3000],
-                "weeks": weeks,
+                "syllabus":  (syllabus_summary or topics_str)[:5000],
+                "topics":    topics_str[:2000],
             })
             text = response.content if hasattr(response, "content") else str(response)
             return self._parse_llm_plan(text, exam_name, important_topics, weeks)

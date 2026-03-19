@@ -356,35 +356,16 @@ year_label = f"Academic Year {CURRENT_YEAR}"
 # (includes exam overview + full syllabus hierarchy + important topics)
 # ─────────────────────────────────────────────────────────────────────────────
 if nav == "📚 Syllabus":
-    st.markdown(f'<div class="sec-title">{exam_name} — Syllabus & Exam Details</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sec-title">{exam_name} — Official Syllabus</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="year-badge">📅 {year_label}</div>', unsafe_allow_html=True)
-
-    # About exam
-    desc = (info.get("description") or "").strip()
-    if desc:
-        st.markdown(f"""
-        <div class="about-box">
-            <div class="about-label">About the Exam</div>
-            <div class="about-val">{desc}</div>
-        </div>""", unsafe_allow_html=True)
-
-    # Deadline
-    dl = info.get("deadline", "Check Official Site")
-    st.markdown(f"""
-    <div class="deadline-box">
-        <div>
-            <div class="dl-label">📅 Application / Registration Deadline</div>
-            <div class="dl-val">{dl}</div>
-        </div>
-        <span style="font-size:2rem;">📋</span>
-    </div>""", unsafe_allow_html=True)
+    st.markdown('<div class="sec-note">Mark topics as you cover them to track your preparation progress.</div>', unsafe_allow_html=True)
 
     # Progress tracker
     done_cnt = sum(1 for k in st.session_state if k.startswith(f"syl_{exam_name}_") and st.session_state[k])
     total    = max(len(syl), 1)
     pct      = int(done_cnt / total * 100)
     st.markdown(f"""
-    <div class="prog-row"><span>Syllabus Progress</span><span>{pct}%</span></div>
+    <div class="prog-row"><span>Progress</span><span>{pct}%</span></div>
     <div class="prog-bg"><div class="prog-fg" style="width:{pct}%;"></div></div>
     """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
