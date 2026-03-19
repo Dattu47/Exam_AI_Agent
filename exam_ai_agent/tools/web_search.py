@@ -128,7 +128,8 @@ class WebSearchTool:
 
         output = {}
 
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        num_workers = max(1, len(queries))
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
             futures = {
                 executor.submit(self._search_bucket, key, qlist, limits.get(key, 7)): key
                 for key, qlist in queries.items()
