@@ -87,33 +87,35 @@ class WebSearchTool:
         Run all search buckets IN PARALLEL for maximum speed.
         Returns grouped dict of results per category.
         """
-        en = exam_name  # shorthand
+        import datetime as _dt
+        year = _dt.datetime.now().year          # current academic year
+        en   = exam_name
 
         queries = {
             "exam_info": [
-                f"{en} exam eligibility syllabus pattern details 2025",
-                f"{en} official notification exam overview site:geeksforgeeks.org OR site:shiksha.com OR site:collegedunia.com",
+                f"{en} exam eligibility syllabus pattern details {year}",
+                f"{en} official notification exam overview {year} site:geeksforgeeks.org OR site:shiksha.com",
             ],
             "syllabus": [
-                f"{en} syllabus 2025 topics chapters site:geeksforgeeks.org",
-                f"{en} complete syllabus subject-wise official",
-                f"{en} syllabus PDF official website",
+                f"{en} syllabus {year} topics chapters site:geeksforgeeks.org",
+                f"{en} complete syllabus subject-wise {year} official",
+                f"{en} syllabus PDF official website {year}",
             ],
             "previous_papers": [
-                f"{en} previous year question papers PDF download",
-                f"{en} past PYQ papers free download",
-                f"{en} solved papers last 5 years",
+                f"{en} previous year question papers PDF download {year}",
+                f"{en} PYQ papers free download last 5 years",
+                f"{en} solved papers {year} official",
             ],
             "exam_pattern": [
-                f"{en} exam pattern marks scheme sections",
+                f"{en} exam pattern marks scheme sections {year}",
             ],
             "study_resources": [
-                f"{en} best books preparation guide recommended",
-                f"{en} free study material notes PDF NPTEL Coursera",
+                f"{en} best books preparation guide recommended {year}",
+                f"{en} free study material notes PDF NPTEL Coursera {year}",
             ],
             "youtube_lectures": [
-                f"{en} complete preparation playlist site:youtube.com",
-                f"{en} exam preparation lectures youtube 2025",
+                f"{en} complete preparation playlist youtube {year}",
+                f"{en} exam lectures youtube {year} full course",
             ],
         }
 

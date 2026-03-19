@@ -1,6 +1,6 @@
 """
-ExamGenie AI — Official Examination Intelligence Platform
-Clean, professional SaaS UI for students. No jargon. Only value.
+ExamGenie AI — Official Examination Preparation Platform
+4-section design: Syllabus | Strategy | Material | Videos
 """
 
 import streamlit as st
@@ -10,35 +10,35 @@ from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+CURRENT_YEAR = datetime.datetime.now().year
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. PAGE CONFIG
+# Page Config
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ExamGenie AI — Exam Preparation Platform",
+    page_title="ExamGenie AI — Exam Preparation",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. DESIGN SYSTEM
+# Design System
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@600;700;800&display=swap');
 
-/* ── Global ── */
 :root {
-    --bg:      #0A0D12;
-    --surface: #111620;
-    --card:    #161C28;
+    --bg:      #08090E;
+    --surface: #10131C;
+    --card:    #14192A;
     --border:  rgba(255,255,255,0.07);
     --accent:  #C8FF00;
-    --accent2: #4F8EF7;
-    --text:    #EDF0F4;
-    --muted:   #6B7280;
-    --green:   #29C97A;
-    --radius:  14px;
+    --accent2: #5B96F7;
+    --text:    #E8ECF3;
+    --muted:   #64718A;
+    --radius:  13px;
 }
 
 html, body, .stApp {
@@ -47,7 +47,6 @@ html, body, .stApp {
     font-family: 'Inter', sans-serif;
 }
 
-/* ── Hide Streamlit chrome ── */
 footer, #MainMenu { visibility: hidden; }
 header { background: transparent !important; }
 .stDeployButton { display: none !important; }
@@ -59,36 +58,22 @@ header { background: transparent !important; }
 }
 [data-testid="stSidebar"] > div { padding-top: 1.5rem !important; }
 
-.brand-logo {
-    font-family: 'Outfit', sans-serif;
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: var(--accent);
-    letter-spacing: -0.5px;
-    margin-bottom: 0.25rem;
-}
-.brand-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 2rem; }
-.board-title { font-size: 0.95rem; font-weight: 600; color: var(--text); }
-.board-time  { font-size: 0.7rem; color: var(--muted); margin-bottom: 1.8rem; }
+.brand { font-family:'Outfit',sans-serif; font-size:1.55rem; font-weight:800;
+         color:var(--accent); letter-spacing:-0.5px; margin-bottom:2px; }
+.brand-sub { font-size:0.72rem; color:var(--muted); margin-bottom:1.8rem; }
+.current-board { font-size:0.9rem; font-weight:600; color:var(--text); }
+.board-meta    { font-size:0.7rem; color:var(--muted); margin-bottom:1.8rem; }
 
-/* ── Page heading ── */
-.page-brand {
-    font-family: 'Outfit', sans-serif;
-    font-size: 1.9rem;
-    font-weight: 800;
-    color: var(--text);
-    text-align: center;
-    margin-bottom: 0.25rem;
+/* ── Page title ── */
+.app-title {
+    font-family:'Outfit',sans-serif;
+    font-size:2rem; font-weight:800;
+    text-align:center; margin-bottom:2px;
 }
-.page-brand span { color: var(--accent); }
-.page-tagline {
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin-bottom: 2rem;
-}
+.app-title span { color:var(--accent); }
+.app-sub { text-align:center; color:var(--muted); font-size:0.88rem; margin-bottom:2rem; }
 
-/* ── Search bar ── */
+/* ── Search ── */
 .stTextInput > div > div > input {
     background: var(--surface) !important;
     border: 1.5px solid var(--border) !important;
@@ -96,11 +81,10 @@ header { background: transparent !important; }
     color: var(--text) !important;
     font-size: 1rem !important;
     padding: 14px 20px !important;
-    transition: border 0.2s;
 }
 .stTextInput > div > div > input:focus {
     border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px rgba(200,255,0,0.08) !important;
+    box-shadow: 0 0 0 3px rgba(200,255,0,0.07) !important;
 }
 
 /* ── Buttons ── */
@@ -112,12 +96,9 @@ div.stButton > button {
     border-radius: 12px !important;
     height: 52px !important;
     font-size: 0.95rem !important;
-    transition: opacity 0.2s, transform 0.1s !important;
+    transition: opacity .2s !important;
 }
-div.stButton > button:hover {
-    opacity: 0.88 !important;
-    transform: scale(1.01) !important;
-}
+div.stButton > button:hover { opacity:.85 !important; }
 .stLinkButton a {
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
@@ -125,34 +106,24 @@ div.stButton > button:hover {
     color: var(--accent) !important;
     font-size: 0.82rem !important;
     font-weight: 600 !important;
-    padding: 6px 14px !important;
 }
 
-/* ── Nav radio ── */
-div[data-testid="stSidebar"] div.stRadio > label { display: none; }
+/* ── Sidebar nav re-style ── */
+div[data-testid="stSidebar"] div.stRadio > label { display:none; }
 div[data-testid="stSidebar"] div[role="radiogroup"] {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display:flex; flex-direction:column; gap:3px;
 }
 div[data-testid="stSidebar"] div[role="radiogroup"] label {
-    padding: 10px 14px !important;
-    border-radius: 10px !important;
-    cursor: pointer;
-    color: var(--muted) !important;
-    font-size: 0.9rem !important;
-    transition: background 0.15s !important;
+    display:flex; align-items:center;
+    padding:11px 14px !important; border-radius:11px !important;
+    color:var(--muted) !important; font-size:0.92rem !important;
+    font-weight:500 !important; cursor:pointer; transition:all .15s;
 }
 div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background: rgba(255,255,255,0.05) !important;
-    color: var(--text) !important;
-}
-div[data-testid="stSidebar"] div[role="radiogroup"] [data-checked="true"] label {
-    background: rgba(200,255,0,0.1) !important;
-    color: var(--accent) !important;
+    background: rgba(255,255,255,0.04) !important; color:var(--text) !important;
 }
 
-/* ── Containers ── */
+/* ── Containers / cards ── */
 [data-testid="stVerticalBlockBorderWrapper"] > div {
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
@@ -160,75 +131,90 @@ div[data-testid="stSidebar"] div[role="radiogroup"] [data-checked="true"] label 
     padding: 1.25rem 1.5rem !important;
 }
 
-/* ── Progress bar ── */
-.prog-wrap { background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; height: 7px; }
-.prog-fill  { height: 100%; border-radius: 6px; background: var(--accent); transition: width 1s; }
-
-/* ── Section heading ── */
-.sec-head {
-    font-family: 'Outfit', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 0.25rem;
+/* ── Section headings ── */
+.sec-title {
+    font-family:'Outfit',sans-serif;
+    font-size:1.35rem; font-weight:700;
+    color:var(--text); margin-bottom:3px;
 }
-.sec-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.5rem; }
+.sec-note { font-size:0.8rem; color:var(--muted); margin-bottom:1.5rem; }
 
-/* ── Chip ── */
+/* ── About exam box ── */
+.about-box {
+    background:var(--card); border:1px solid var(--border);
+    border-left:3px solid var(--accent2);
+    border-radius:var(--radius); padding:18px 22px; margin-bottom:1rem;
+}
+.about-label { font-size:0.68rem; color:var(--muted); font-weight:700;
+               text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+.about-val   { font-size:0.97rem; color:var(--text); line-height:1.7; }
+
+/* ── Deadline box ── */
+.deadline-box {
+    background:var(--card); border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:var(--radius); padding:16px 22px; margin-bottom:1.5rem;
+    display:flex; align-items:center; justify-content:space-between;
+}
+.dl-label { font-size:0.7rem; color:var(--muted); font-weight:700; text-transform:uppercase; }
+.dl-val   { font-size:1.1rem; font-weight:700; color:var(--accent); margin-top:3px; }
+
+/* ── Year badge ── */
+.year-badge {
+    background:rgba(200,255,0,0.1); border:1px solid rgba(200,255,0,0.25);
+    color:var(--accent); border-radius:20px; padding:3px 12px;
+    font-size:0.75rem; font-weight:700; display:inline-block; margin-bottom:1.5rem;
+}
+
+/* ── Topic chips ── */
+.chip-grid { display:flex; flex-wrap:wrap; gap:7px; margin-top:.75rem; }
 .chip {
-    display: inline-block;
-    background: rgba(200,255,0,0.1);
-    border: 1px solid rgba(200,255,0,0.25);
-    color: var(--accent);
-    border-radius: 20px;
-    padding: 3px 12px;
-    font-size: 0.77rem;
-    font-weight: 600;
-    margin: 3px 2px;
+    background:rgba(255,255,255,0.05); border:1px solid var(--border);
+    color:var(--text); border-radius:20px; padding:4px 13px;
+    font-size:0.78rem; font-weight:500;
 }
 
-/* ── Tag bar ── */
-.tag-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.75rem; }
+/* ── Progress bar ── */
+.prog-row { display:flex; justify-content:space-between;
+            font-size:0.78rem; color:var(--muted); margin-bottom:5px; }
+.prog-row span:last-child { color:var(--accent); font-weight:700; }
+.prog-bg { background:rgba(255,255,255,0.05); border-radius:6px; height:7px; }
+.prog-fg { border-radius:6px; height:7px; background:var(--accent); transition:width 1s; }
 
-/* ── Topic Card ── */
-.topic-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-bottom: 10px;
-}
-.topic-title { font-weight: 600; font-size: 1rem; margin-bottom: 6px; }
-.topic-sub   { color: var(--muted); font-size: 0.82rem; line-height: 1.7; }
-
-/* ── Info box ── */
-.info-box {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 24px;
-    margin-bottom: 1rem;
-}
-.info-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
-.info-value { font-size: 1rem; font-weight: 500; color: var(--text); }
+/* ── Syllabus topic row ── */
+.syl-row { border-bottom:1px solid var(--border); padding:12px 0 10px; }
+.syl-topic { font-size:0.95rem; font-weight:600; color:var(--text); margin-bottom:4px; }
+.syl-subs  { font-size:0.8rem; color:var(--muted); line-height:1.7; }
 
 /* ── Week expander ── */
-.stExpander { border: 1px solid var(--border) !important; border-radius: var(--radius) !important; background: var(--card) !important; margin-bottom: 8px !important; }
-.stExpander > details > summary { font-size: 0.95rem !important; font-weight: 600 !important; }
+.stExpander {
+    border:1px solid var(--border) !important;
+    border-radius:var(--radius) !important;
+    background:var(--card) !important;
+    margin-bottom:8px !important;
+}
 
-/* ── Chat ── */
-.stChatMessage { background: var(--card) !important; border-radius: 12px !important; }
+/* ── Day tasks ── */
+.day-task {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+    font-size:0.88rem; color:var(--text);
+}
+.task-dot { color:var(--accent); font-size:0.7rem; padding-top:3px; flex-shrink:0; }
+
+/* ── Tip callout ── */
+.tip-box {
+    margin-top:10px; padding:10px 14px;
+    background:rgba(200,255,0,0.05); border-left:3px solid var(--accent);
+    border-radius:8px; font-size:0.83rem; color:var(--text);
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. SESSION STATE
+# Session State
 # ─────────────────────────────────────────────────────────────────────────────
-for k, v in [
-    ("agent", None), ("results", None),
-    ("last_exam", ""), ("updated_at", ""),
-]:
+for k, v in [("agent", None), ("results", None), ("last_exam", ""), ("updated_at", "")]:
     if k not in st.session_state:
         st.session_state[k] = v
 
@@ -237,21 +223,19 @@ if st.session_state.agent is None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. RESEARCH PIPELINE
+# Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 def run_pipeline(exam_name: str) -> dict | None:
-    with st.status(f"Researching **{exam_name}**…", expanded=True) as status:
+    with st.status(f"Researching **{exam_name}** ({CURRENT_YEAR})…", expanded=True) as status:
         try:
             agent = st.session_state.agent
 
-            status.update(label="Searching official sites and study portals…")
+            status.update(label="Searching official portals and study sites…")
             raw = agent.search_agent.find_resources(exam_name)
 
-            status.update(label="Reading and extracting syllabus documents…")
-            s_urls = [
-                (r.url if hasattr(r, "url") else r.get("url", ""))
-                for r in raw.get("syllabus", [])[:12]
-            ]
+            status.update(label="Reading and extracting syllabus content…")
+            s_urls = [(r.url if hasattr(r, "url") else r.get("url", ""))
+                      for r in raw.get("syllabus", [])[:12]]
             pages, pdfs = agent.scraping_agent.scrape_sources(s_urls, max_pages=10)
 
             status.update(label="Building structured syllabus…")
@@ -259,7 +243,7 @@ def run_pipeline(exam_name: str) -> dict | None:
                 exam_name, pages, s_urls, raw.get("exam_pattern", [])
             )
 
-            status.update(label="Creating your personalised preparation plan…")
+            status.update(label="Creating your personalised study plan…")
             plan = agent.study_agent.build_plan(exam_name, syllabus, topics, weeks=4)
 
             status.update(label="Compiling resources, papers, and videos…")
@@ -273,32 +257,36 @@ def run_pipeline(exam_name: str) -> dict | None:
                 syllabus, topics, plan, pdfs, chunks,
             )
 
-            st.session_state.updated_at = datetime.datetime.now().strftime("%d %b, %I:%M %p")
-            status.update(label="Done! Your strategy is ready.", state="complete", expanded=False)
+            st.session_state.updated_at = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
+            status.update(label="Done! Your preparation plan is ready.", state="complete", expanded=False)
             return final
 
         except Exception as e:
             status.update(label="Something went wrong.", state="error", expanded=True)
-            st.error(f"Error: {e}")
+            st.error(str(e))
             return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. PERSISTENT SEARCH BAR (always visible)
+# Top: Brand + Persistent Search
 # ─────────────────────────────────────────────────────────────────────────────
-st.markdown('<div class="page-brand">🎯 <span>ExamGenie</span> AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="page-tagline">Your complete exam preparation companion — syllabus, strategy, papers &amp; videos in one place.</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="app-title">🎯 <span>ExamGenie</span> AI</div>', unsafe_allow_html=True)
+st.markdown(
+    f'<div class="app-sub">Your complete exam preparation companion for {CURRENT_YEAR} — '
+    'syllabus, strategy, papers &amp; videos in one place.</div>',
+    unsafe_allow_html=True,
+)
 
-s1, s2 = st.columns([5, 1])
-with s1:
+sc1, sc2 = st.columns([5, 1])
+with sc1:
     exam_q = st.text_input(
         "exam_search",
         value=st.session_state.last_exam,
-        placeholder="Search any exam: JEE, UPSC, GATE, TCS NQT, CAT…",
+        placeholder=f"Search any exam for {CURRENT_YEAR}: JEE, UPSC, GATE, TCS NQT, CAT…",
         label_visibility="collapsed",
     )
-with s2:
-    go = st.button("Search  🔍", use_container_width=True)
+with sc2:
+    go = st.button("Search 🔍", use_container_width=True)
 
 if go and exam_q.strip():
     result = run_pipeline(exam_q.strip())
@@ -309,150 +297,182 @@ if go and exam_q.strip():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. SIDEBAR NAV
+# Sidebar
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown('<div class="brand-logo">🎯 ExamGenie AI</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand">🎯 ExamGenie AI</div>', unsafe_allow_html=True)
     st.markdown('<div class="brand-sub">Exam Preparation Platform</div>', unsafe_allow_html=True)
 
     curr = st.session_state.last_exam or "—"
-    st.markdown(f'<div class="board-title">📌 {curr}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="current-board">📌 {curr}</div>', unsafe_allow_html=True)
     if st.session_state.updated_at:
-        st.markdown(f'<div class="board-time">Updated: {st.session_state.updated_at}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="board-meta">Updated: {st.session_state.updated_at}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
     nav = st.radio(
         "Navigate",
         options=[
-            "📋 Exam Overview",
             "📚 Syllabus",
-            "🗓️ Study Plan",
-            "📄 Question Papers",
-            "🔗 Study Material",
-            "▶️ Video Lectures",
+            "🗓️ Preparation Strategy",
+            "📖 Preparation Material",
+            "▶️ YouTube Videos",
         ],
         index=0,
     )
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. EMPTY STATE
+# Empty State
 # ─────────────────────────────────────────────────────────────────────────────
 if not st.session_state.results:
     st.markdown("""
-    <div style="text-align:center; padding:5rem 2rem; opacity:0.55;">
-        <div style="font-size:3.5rem; margin-bottom:1rem;">🎯</div>
-        <h3 style="font-family:'Outfit',sans-serif; font-weight:700;">Ready when you are.</h3>
-        <p style="font-size:0.9rem;">Type the name of any competitive exam above and hit Search.</p>
+    <div style="text-align:center; padding:5rem 2rem; opacity:0.45;">
+        <div style="font-size:4rem; margin-bottom:1rem;">🎯</div>
+        <h3 style="font-family:'Outfit',sans-serif; font-weight:700; margin-bottom:.5rem;">Ready when you are.</h3>
+        <p style="font-size:0.88rem;">Type the name of any competitive exam above and press Search.</p>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. CONTENT PAGES
+# Data
 # ─────────────────────────────────────────────────────────────────────────────
 data      = st.session_state.results
 exam_name = st.session_state.last_exam
+info      = data.get("about_exam") or {}
+syl       = data.get("syllabus") or []
+topics    = data.get("important_topics") or []
+plan      = data.get("study_plan") or []
+papers    = data.get("previous_papers") or []
+resources = data.get("resources") or []
+videos    = data.get("youtube_lectures") or []
 
-# ── EXAM OVERVIEW ─────────────────────────────────────────────────────────────
-if nav == "📋 Exam Overview":
-    st.markdown(f'<div class="sec-head">{exam_name} — Exam Overview</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Key facts, dates, and important topics at a glance.</div>', unsafe_allow_html=True)
+year_label = f"Academic Year {CURRENT_YEAR}"
 
-    info = data.get("about_exam") or {}
-    desc = info.get("description", "").strip()
 
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 1 — SYLLABUS
+# (includes exam overview + full syllabus hierarchy + important topics)
+# ─────────────────────────────────────────────────────────────────────────────
+if nav == "📚 Syllabus":
+    st.markdown(f'<div class="sec-title">{exam_name} — Syllabus & Exam Details</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="year-badge">📅 {year_label}</div>', unsafe_allow_html=True)
+
+    # About exam
+    desc = (info.get("description") or "").strip()
     if desc:
         st.markdown(f"""
-        <div class="info-box">
-            <div class="info-label">About the Exam</div>
-            <div class="info-value">{desc}</div>
+        <div class="about-box">
+            <div class="about-label">About the Exam</div>
+            <div class="about-val">{desc}</div>
         </div>""", unsafe_allow_html=True)
-    else:
-        st.info("Exam overview not found. Please visit the official website for details.")
 
-    deadline = info.get("deadline", "Check Official Site")
+    # Deadline
+    dl = info.get("deadline", "Check Official Site")
     st.markdown(f"""
-    <div class="info-box">
-        <div class="info-label">📅 Application / Registration Deadline</div>
-        <div class="info-value" style="font-size:1.15rem; font-weight:700; color:var(--accent);">{deadline}</div>
+    <div class="deadline-box">
+        <div>
+            <div class="dl-label">📅 Application / Registration Deadline</div>
+            <div class="dl-val">{dl}</div>
+        </div>
+        <span style="font-size:2rem;">📋</span>
     </div>""", unsafe_allow_html=True)
 
-    st.markdown("---")
-    topics = data.get("important_topics") or []
-    if topics:
-        st.markdown('<div class="sec-head" style="font-size:1.1rem;">High-Weightage Topics</div>', unsafe_allow_html=True)
-        chips = "".join([f'<span class="chip">🔥 {t}</span>' for t in topics[:15]])
-        st.markdown(f'<div class="tag-bar">{chips}</div>', unsafe_allow_html=True)
-
-
-# ── SYLLABUS ──────────────────────────────────────────────────────────────────
-elif nav == "📚 Syllabus":
-    syl = data.get("syllabus") or []
-    done = sum(1 for k, v in st.session_state.items() if k.startswith(f"syl_{exam_name}_") and v)
-    pct  = int(done / max(len(syl), 1) * 100)
-
-    st.markdown(f'<div class="sec-head">Official Syllabus — {exam_name}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sec-sub">Sourced from official portals and leading study sites. Mark topics as you complete them.</div>', unsafe_allow_html=True)
-
-    # Progress
+    # Progress tracker
+    done_cnt = sum(1 for k in st.session_state if k.startswith(f"syl_{exam_name}_") and st.session_state[k])
+    total    = max(len(syl), 1)
+    pct      = int(done_cnt / total * 100)
     st.markdown(f"""
-    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--muted); margin-bottom:5px;">
-        <span>Progress</span><span style="color:var(--accent); font-weight:700;">{pct}%</span>
-    </div>
-    <div class="prog-wrap"><div class="prog-fill" style="width:{pct}%;"></div></div>
+    <div class="prog-row"><span>Syllabus Progress</span><span>{pct}%</span></div>
+    <div class="prog-bg"><div class="prog-fg" style="width:{pct}%;"></div></div>
     """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # Syllabus topics with checkboxes
     if syl:
         for item in syl:
-            key   = f"syl_{exam_name}_{item.get('topic', item)}"
             topic = item.get("topic") if isinstance(item, dict) else str(item)
             subs  = item.get("subtopics", []) if isinstance(item, dict) else []
-            done_ = st.checkbox(topic, value=st.session_state.get(key, False), key=key)
-            if subs:
-                sub_txt = " &nbsp;·&nbsp; ".join(subs[:12])
-                st.markdown(f'<div style="margin:-8px 0 10px 28px; color:var(--muted); font-size:0.82rem;">{sub_txt}</div>', unsafe_allow_html=True)
+            key   = f"syl_{exam_name}_{topic}"
+
+            col_chk, col_txt = st.columns([1, 18])
+            with col_chk:
+                st.checkbox(" ", value=st.session_state.get(key, False), key=key, label_visibility="hidden")
+            with col_txt:
+                st.markdown(f'<div class="syl-topic">{"✅ " if st.session_state.get(key) else ""}{topic}</div>', unsafe_allow_html=True)
+                if subs:
+                    st.markdown(
+                        f'<div class="syl-subs">' + " &nbsp;·&nbsp; ".join(subs[:14]) + '</div>',
+                        unsafe_allow_html=True
+                    )
+            st.markdown('<div style="border-bottom:1px solid rgba(255,255,255,0.05); margin:2px 0;"></div>', unsafe_allow_html=True)
     else:
-        st.warning("Syllabus not found for this exam. Try searching again or check the official site.")
+        st.warning("Syllabus not available. Please try searching again or visit the official site.")
+
+    # High-weightage topics chips
+    if topics:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="sec-title" style="font-size:1.1rem;">🔥 High-Weightage Topics</div>', unsafe_allow_html=True)
+        chips_html = "".join([f'<span class="chip">{t}</span>' for t in topics[:18]])
+        st.markdown(f'<div class="chip-grid">{chips_html}</div>', unsafe_allow_html=True)
 
 
-# ── STUDY PLAN ────────────────────────────────────────────────────────────────
-elif nav == "🗓️ Study Plan":
-    st.markdown(f'<div class="sec-head">4-Week Preparation Strategy — {exam_name}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Personalised day-wise plan built around your actual syllabus topics.</div>', unsafe_allow_html=True)
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 2 — PREPARATION STRATEGY
+# (4-week plan whose topics are drawn directly from the syllabus above)
+# ─────────────────────────────────────────────────────────────────────────────
+elif nav == "🗓️ Preparation Strategy":
+    st.markdown(f'<div class="sec-title">4-Week Preparation Strategy — {exam_name}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="sec-note">Day-by-day timetable built around your {exam_name} syllabus topics. '
+        f'Topics are sourced directly from the Syllabus section.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(f'<div class="year-badge">📅 {year_label}</div>', unsafe_allow_html=True)
 
-    plan = data.get("study_plan") or []
+    # Show which syllabus topics are covered
+    if syl:
+        covered = [item.get("topic") if isinstance(item, dict) else str(item) for item in syl[:6]]
+        chips_html = "".join([f'<span class="chip">📌 {t}</span>' for t in covered])
+        st.markdown(f'<div style="margin-bottom:1.5rem;" class="chip-grid">{chips_html}</div>', unsafe_allow_html=True)
+
     if plan:
         for wk in plan:
             label = f"Week {wk.get('week')}  —  {wk.get('focus', '')}"
-            with st.expander(label, expanded=True):
+            with st.expander(label, expanded=(wk.get("week") == 1)):
                 tasks = wk.get("tasks") or []
                 for t in tasks:
-                    st.markdown(f"&nbsp;&nbsp;◈ &nbsp;{t}", unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div class="day-task"><span class="task-dot">◈</span><span>{t}</span></div>',
+                        unsafe_allow_html=True
+                    )
                 if wk.get("tip"):
                     st.markdown(
-                        f"<div style='margin-top:10px; padding:10px 14px; background:rgba(200,255,0,0.06); "
-                        f"border-left:3px solid var(--accent); border-radius:8px; font-size:0.85rem;'>"
-                        f"💡 <b>Tip:</b> {wk['tip']}</div>",
+                        f'<div class="tip-box">💡 <b>Strategy Tip:</b> {wk["tip"]}</div>',
                         unsafe_allow_html=True
                     )
     else:
-        st.info("Study plan not generated. Try regenerating the search.")
+        st.info("Study plan not generated. Please regenerate by searching again.")
 
 
-# ── QUESTION PAPERS ───────────────────────────────────────────────────────────
-elif nav == "📄 Question Papers":
-    st.markdown(f'<div class="sec-head">Previous Year Question Papers — {exam_name}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Download official question papers and practice with real exam questions.</div>', unsafe_allow_html=True)
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 3 — PREPARATION MATERIAL
+# (PYQs + books + notes + free courses)
+# ─────────────────────────────────────────────────────────────────────────────
+elif nav == "📖 Preparation Material":
+    st.markdown(f'<div class="sec-title">Preparation Material — {exam_name}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-note">Previous year papers, recommended books, notes, and free online courses.</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="year-badge">📅 {year_label}</div>', unsafe_allow_html=True)
 
-    papers = data.get("previous_papers") or []
+    # PYQ Section
+    st.markdown("#### 📄 Previous Year Question Papers")
     if papers:
         for p in papers:
             url   = p.get("url", "#")
             title = p.get("title", "Question Paper")
             ptype = p.get("type", "link")
-            badge = "📄 PDF" if ptype == "pdf" else "🔗 Link"
+            badge = "📄 PDF" if ptype == "pdf" else "🔗 Web"
             with st.container(border=True):
                 c1, c2 = st.columns([5, 1])
                 with c1:
@@ -461,15 +481,12 @@ elif nav == "📄 Question Papers":
                 with c2:
                     st.link_button("Open →", url, use_container_width=True)
     else:
-        st.info("No question papers found. Please search on the official exam website.")
+        st.info("No question papers found. Search on the official website.")
 
+    st.markdown("---")
 
-# ── STUDY MATERIAL ────────────────────────────────────────────────────────────
-elif nav == "🔗 Study Material":
-    st.markdown(f'<div class="sec-head">Recommended Study Material — {exam_name}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Books, notes, and free online courses to help you prepare.</div>', unsafe_allow_html=True)
-
-    resources = data.get("resources") or []
+    # Study Resources Section
+    st.markdown("#### 📚 Study Resources & Books")
     if resources:
         for r in resources:
             with st.container(border=True):
@@ -482,18 +499,23 @@ elif nav == "🔗 Study Material":
         st.info("No study material found. Try a more specific exam name.")
 
 
-# ── VIDEO LECTURES ────────────────────────────────────────────────────────────
-elif nav == "▶️ Video Lectures":
-    st.markdown(f'<div class="sec-head">Video Lectures — {exam_name}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Curated video playlists and lectures for visual learners.</div>', unsafe_allow_html=True)
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 4 — YOUTUBE VIDEOS
+# ─────────────────────────────────────────────────────────────────────────────
+elif nav == "▶️ YouTube Videos":
+    st.markdown(f'<div class="sec-title">Video Lectures — {exam_name}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="sec-note">Curated {CURRENT_YEAR} playlists and video lectures for {exam_name} preparation.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(f'<div class="year-badge">📅 {year_label}</div>', unsafe_allow_html=True)
 
-    vids = data.get("youtube_lectures") or []
-    if vids:
-        cols = st.columns(2)
-        for i, v in enumerate(vids[:10]):
+    if videos:
+        vcols = st.columns(2)
+        for i, v in enumerate(videos[:10]):
             url   = v.get("url", "")
             title = v.get("title", "Lecture")
-            with cols[i % 2]:
+            with vcols[i % 2]:
                 with st.container(border=True):
                     st.markdown(f"**{title}**")
                     if "youtube.com" in url or "youtu.be" in url:
@@ -503,7 +525,7 @@ elif nav == "▶️ Video Lectures":
                             pass
                     st.link_button("▶️ Watch on YouTube", url, use_container_width=True)
     else:
-        st.info("No video lectures found for this exam.")
+        st.info("No video lectures found. Try searching with the exact exam name.")
 
 
 st.markdown("<br><br><br>", unsafe_allow_html=True)
