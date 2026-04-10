@@ -6,6 +6,7 @@ Uses multi-source aggregation + LLM for structured, accurate syllabus generation
 import os
 import json
 import datetime
+import re
 from typing import List, Dict, Any, Tuple
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
@@ -102,44 +103,76 @@ class ProcessingAgent:
                 # Also include raw text snippets so LLM can fill gaps
                 text_context = " | ".join([c[:500] for c in all_text_chunks[:5]])
 
-                prompt = ChatPromptTemplate.from_messages([
-                    ("system",
-                     f"You are an expert academic researcher specializing in competitive exam syllabi for {CURRENT_YEAR}.\n"
-                     "Your task: Generate the COMPLETE, ACCURATE, OFFICIAL syllabus for the given exam.\n"
-                     "STRICT RULES:\n"
-                     f"1. Use your knowledge of {exam_name} PLUS the extracted content to produce the FULL official syllabus.\n"
-                     "2. Output ONLY valid JSON — no markdown, no explanation.\n"
-                     "3. Format:\n"
-                     '   {"syllabus": [{"topic": "Topic Name", "subtopics": ["Sub 1", "Sub 2", ...]}, ...], '
-                     '"important_topics": ["Topic A", "Topic B", ...]}\n'
-                     "4. Each topic must have AT LEAST 3 specific subtopics (not generic).\n"
-                     "5. Do NOT include: dates, deadlines, application info, exam fees, eligibility.\n"
-                     "6. Only REAL syllabus topics — subjects, chapters, concepts.\n"
-                     "7. Cover ALL sections of the exam properly.\n"
-                     "8. 'important_topics' = list of 10-15 highest-weightage topic names only (strings)."
-                    ),
-                    ("human",
-                     f"Exam: {exam_name} ({CURRENT_YEAR})\n\n"
-                     f"Extracted raw topics: {raw_json}\n\n"
-                     f"Additional context from scraped pages: {text_context}")
-                ])
-                chain = prompt | self.llm
-                res = chain.invoke({})
+                # Build prompt as plain string to avoid LangChain brace-escaping issues
+                system_msg = (
+                    f"You are a Senior Academic Research Specialist with deep expertise in {exam_name} "
+                    f"and Indian/global competitive examinations.\n\n"
+                    "YOUR MISSION: Extract and validate the COMPLETE, OFFICIAL syllabus for this exam.\n\n"
+                    "SOURCE PRIORITY (use in this order):\n"
+                    "  1. Official exam website / conducting body\n"
+                    "  2. Official notification PDF\n"
+                    "  3. Government / conducting authority documents\n"
+                    "  4. Scraped data provided below (cross-validate, do not blindly trust)\n\n"
+                    "STRICT ACCURACY RULES:\n"
+                    "1. NO HALLUCINATION — Every topic MUST exist in the real official syllabus. "
+                    "If a topic from scraped data looks incorrect, replace it with the correct official topic. "
+                    "If a subject/topic is genuinely uncertain, still include it but note it is 'Not explicitly confirmed'.\n"
+                    "2. HIERARCHICAL STRUCTURE — Organise as: Subject → Topic → Subtopics. "
+                    "Each 'topic' field should be the subject name (e.g., Mathematics, English Language, "
+                    "Reasoning Ability, General Awareness, Computer Knowledge, etc.). "
+                    "Subtopics must be the specific chapters/concepts within that subject.\n"
+                    "3. GRANULAR SUBTOPICS — Each subject must have 6-15 precise, named subtopics. "
+                    "BAD: 'Algebra' | GOOD: 'Quadratic Equations, Polynomials, Linear Equations, Inequalities'\n"
+                    "4. COMPLETENESS — Include ALL subjects from the exam. "
+                    "For Bank/SSC exams: English, Reasoning, Quant, GA, Computer. "
+                    "For Engineering exams: all technical subjects. "
+                    "For Civil Services: all GS papers + optional subjects structure.\n"
+                    "5. ZERO ADMINISTRATIVE CLUTTER — Subtopics must be ONLY academic/conceptual content. "
+                    "NEVER include: fees, eligibility, registration, dates, admit card, results, "
+                    "cut-offs, login, notifications, how to apply, official website, counselling.\n"
+                    "6. EXAM PATTERN AWARENESS — If you know the exam has Prelims + Mains or multiple papers, "
+                    "separate them in the syllabus (e.g., 'Mathematics (Prelims)', 'Mathematics (Mains)').\n"
+                    "7. HIGH-WEIGHTAGE TOPICS — Identify the 15-20 most frequently asked / highest-weightage "
+                    "topics based on official pattern and previous years.\n\n"
+                    "OUTPUT FORMAT — Raw JSON only, no markdown, no HTML tags, no asterisks:\n"
+                    '{"syllabus": [{"topic": "Subject Name", "subtopics": ["Concept 1", "Concept 2", "Concept 3"]}], '
+                    '"important_topics": ["High-weightage topic 1", "High-weightage topic 2"], '
+                    '"confidence_level": "high/medium/low", '
+                    '"notes": "Any discrepancies or uncertainties noted"}'
+                )
+                human_msg = (
+                    f"EXAM: {exam_name} ({CURRENT_YEAR})\n\n"
+                    f"SCRAPED SYLLABUS DATA (cross-validate this):\n{raw_json}\n\n"
+                    f"ADDITIONAL SCRAPED CONTEXT:\n{text_context}\n\n"
+                    "Instructions:\n"
+                    "- Compare the scraped data against your authoritative knowledge of this exam.\n"
+                    "- Correct any wrong topics. Fill gaps with official topics you know.\n"
+                    "- If scraped data is poor/empty, generate the syllabus from your own knowledge.\n"
+                    "- Return the complete, validated, structured syllabus JSON now."
+                )
+                from langchain_core.messages import SystemMessage, HumanMessage
+                res = self.llm.invoke([SystemMessage(content=system_msg), HumanMessage(content=human_msg)])
                 text = res.content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+                # Extract JSON from response robustly
+                start = text.find("{")
+                end   = text.rfind("}") + 1
+                if start != -1 and end > start:
+                    text = text[start:end]
                 parsed = json.loads(text)
 
                 for item in parsed.get("syllabus", []):
-                    t = str(item.get("topic", "")).strip()
+                    t = re.sub(r'<[^>]*>', '', str(item.get("topic", ""))).strip()
                     if not t:
                         continue
+                    clean_subs = [re.sub(r'<[^>]*>', '', str(s)).replace('*', '').strip() for s in item.get("subtopics", []) if s]
                     final_syllabus.append({
                         "topic":     t,
-                        "subtopics": [str(s) for s in item.get("subtopics", []) if s],
+                        "subtopics": [s for s in clean_subs if s],
                         "source_url": "",
                     })
 
                 important_topics = [
-                    str(t).strip() for t in parsed.get("important_topics", []) if t
+                    re.sub(r'<[^>]*>', '', str(t)).strip() for t in parsed.get("important_topics", []) if t
                 ][:20]
 
                 logger.info(

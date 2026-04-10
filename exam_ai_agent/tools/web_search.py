@@ -1,6 +1,7 @@
 """
 Web Search Tool — DuckDuckGo powered, multi-bucket parallel search.
-Targets authoritative educational sources for accurate, deduplicated results.
+Targets authoritative Indian exam portals and official bodies for
+accurate, deduplicated, end-to-end exam data.
 """
 
 import time
@@ -12,6 +13,37 @@ from exam_ai_agent.config import settings
 from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# ── Authoritative source domains (used inside queries, never shown to users) ──
+_OFFICIAL_PORTALS = (
+    "site:nta.ac.in OR site:ssc.nic.in OR site:upsc.gov.in OR site:gate.iitkgp.ac.in"
+)
+_EXAM_INFO_SITES = (
+    "site:careers360.com OR site:shiksha.com OR site:geeksforgeeks.org OR site:testbook.com"
+)
+_GOVT_EXAM_SITES = (
+    "site:careers360.com OR site:testbook.com OR site:adda247.com OR site:shiksha.com"
+)
+_PLACEMENT_SITES = (
+    "site:geeksforgeeks.org OR site:indiabix.com OR site:interviewbit.com OR site:testbook.com"
+)
+_PYQ_SITES = (
+    "site:pyqpaper.com OR site:examrace.com OR site:mrunal.org OR site:testbook.com "
+    "OR site:careers360.com OR site:geeksforgeeks.org"
+)
+_OFFICIAL_PYQ_SITES = (
+    "site:upsc.gov.in OR site:ssc.nic.in OR site:nta.ac.in OR site:ibps.in OR site:rbi.org.in"
+)
+_RESOURCE_SITES = (
+    "site:geeksforgeeks.org OR site:testbook.com OR site:careers360.com OR site:indiabix.com"
+)
+_STUDY_MATERIAL_SITES = (
+    "site:geeksforgeeks.org OR site:tutorialspoint.com OR site:nptel.ac.in "
+    "OR site:testbook.com OR site:adda247.com"
+)
+_YOUTUBE_CHANNELS = (
+    "site:youtube.com"
+)
 
 
 @dataclass
@@ -85,46 +117,83 @@ class WebSearchTool:
     def search_exam_resources(self, exam_name: str) -> dict:
         """
         Run all search buckets IN PARALLEL for maximum speed.
+        Queries target authoritative Indian exam portals and official bodies.
         Returns grouped dict of results per category.
         """
         import datetime as _dt
-        year = _dt.datetime.now().year          # current academic year
+        year = _dt.datetime.now().year
         en   = exam_name
 
         queries = {
+            # ── Exam overview / eligibility / pattern ──────────────────────────
             "exam_info": [
-                f"{en} exam eligibility syllabus pattern details {year}",
-                f"{en} official notification exam overview {year} site:geeksforgeeks.org OR site:shiksha.com",
+                f"{en} exam eligibility syllabus exam pattern complete details {year}",
+                f"{en} official notification eligibility criteria {year} {_OFFICIAL_PORTALS}",
+                f"{en} exam overview conducting authority {year} {_EXAM_INFO_SITES}",
+                f"{en} exam {year} full details marks scheme sections {_GOVT_EXAM_SITES}",
             ],
+
+            # ── Syllabus — highest priority; pull from trusted portals ─────────
             "syllabus": [
-                f"{en} syllabus {year} topics chapters site:geeksforgeeks.org",
-                f"{en} complete syllabus subject-wise {year} official",
-                f"{en} syllabus PDF official website {year}",
+                f"{en} complete syllabus {year} subject-wise topics chapters {_EXAM_INFO_SITES}",
+                f"{en} syllabus PDF official {year} {_OFFICIAL_PORTALS}",
+                f"{en} detailed syllabus {year} all subjects units {_GOVT_EXAM_SITES}",
+                f"{en} syllabus {year} topic list preparation {_PLACEMENT_SITES}",
+                f"{en} updated syllabus {year} topics subtopics official",
             ],
+
+            # ── Previous Year Papers (PYQs) — year-wise + stage-wise ──────────
             "previous_papers": [
-                f"{en} previous year question papers PDF download {year}",
-                f"{en} PYQ papers free download last 5 years",
-                f"{en} solved papers {year} official",
+                f"{en} previous year question papers PDF free download {year} {_PYQ_SITES}",
+                f"{en} PYQ solved papers last 5 years free PDF official {_PYQ_SITES}",
+                f"{en} question papers {year} {year-1} {year-2} download official {_OFFICIAL_PYQ_SITES}",
+                f"{en} prelims previous year papers PDF download official",
+                f"{en} mains previous year papers PDF download free",
+                f"{en} previous papers with solutions PDF {_PYQ_SITES}",
             ],
+
+            # ── Model Papers / Mock Tests ──────────────────────────────────────
+            "model_papers": [
+                f"{en} model papers mock tests free PDF official sample papers {year}",
+                f"{en} full length mock test practice papers {year} {_RESOURCE_SITES}",
+                f"{en} sample question paper official {year} {_OFFICIAL_PORTALS}",
+                f"{en} online mock test free {year} {_GOVT_EXAM_SITES}",
+                f"{en} sectional mock test subject-wise practice {_RESOURCE_SITES}",
+            ],
+
+            # ── Exam pattern / marking scheme ──────────────────────────────────
             "exam_pattern": [
-                f"{en} exam pattern marks scheme sections {year}",
+                f"{en} exam pattern marks scheme sections {year} {_EXAM_INFO_SITES}",
+                f"{en} marking scheme negative marking total marks {year}",
+                f"{en} exam structure sections time duration {year} official",
             ],
+
+            # ── Subject-wise Study Material / Notes / PDFs ────────────────────
             "study_resources": [
-                f"{en} best books preparation guide recommended {year}",
-                f"{en} free study material notes PDF NPTEL Coursera {year}",
+                f"{en} subject-wise study material notes PDF free {year} {_STUDY_MATERIAL_SITES}",
+                f"{en} best books preparation guide recommended {year} {_RESOURCE_SITES}",
+                f"{en} free study notes PDF topic-wise {year} {_STUDY_MATERIAL_SITES}",
+                f"{en} NPTEL free course study material {year}",
+                f"{en} preparation tips important books subject notes {year}",
             ],
+
+            # ── YouTube — complete playlists / structured courses only ─────────
             "youtube_lectures": [
-                f"{en} complete preparation playlist youtube {year}",
-                f"{en} exam lectures youtube {year} full course",
+                f"{en} complete preparation full course playlist {_YOUTUBE_CHANNELS} {year}",
+                f"{en} full syllabus video lectures playlist {_YOUTUBE_CHANNELS}",
+                f"{en} subject-wise video lectures playlist {_YOUTUBE_CHANNELS} {year}",
+                f"{en} best youtube channel complete course {year}",
+                f"{en} free video course lectures {_YOUTUBE_CHANNELS}",
             ],
         }
 
         limits = {
-            "exam_info": 5,
-            "syllabus": 8,
-            "previous_papers": 10,
-            "exam_pattern": 5,
-            "study_resources": 8,
+            "exam_info":        6,
+            "syllabus":        10,
+            "previous_papers": 12,
+            "model_papers":     8,
+            "exam_pattern":     6,
+            "study_resources":  8,
             "youtube_lectures": 8,
         }
 

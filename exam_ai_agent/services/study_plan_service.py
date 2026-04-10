@@ -1,71 +1,82 @@
 """
-Study plan service: generates a structured study timetable and strategy
-using LLM (Ollama) and/or template-based fallback.
+Study plan service: generates a structured, phase-wise preparation strategy
+using LLM (Groq) with a template-based fallback.
 """
 
-from typing import List, Optional, Any
+import json
+import re
+import datetime
+from typing import List, Optional
 
-from exam_ai_agent.config import settings
 from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+CURRENT_YEAR = datetime.datetime.now().year
+
 
 class StudyPlanService:
     """
-    Generates study plan (timetable + strategy) from exam name and optional context.
-    Uses LLM constructed via ChatGroq; otherwise returns a sensible template.
+    Generates a phase-wise, sequenced study strategy from exam name and syllabus.
+    Phases: Foundations → Core → Advanced → Revision & Mocks.
+    Uses LLM via ChatGroq; falls back to a topic-based template on failure.
     """
 
     def __init__(self, llm=None):
         self._llm = llm
 
-    def _template_plan(self, exam_name: str, important_topics: Optional[List[str]] = None) -> List[dict]:
-        """Return a study plan for this exam using real topics when available."""
+    # ──────────────────────────────────────────────────────────────────────────
+    # Template fallback
+    # ──────────────────────────────────────────────────────────────────────────
+    def _template_plan(
+        self,
+        exam_name: str,
+        important_topics: Optional[List[str]] = None,
+    ) -> List[dict]:
+        """Return a phase-split sequential plan using available topic names."""
         topics = list(important_topics or [])
-        # Build topic-focused weeks
-        plan = [
-            {
-                "week": 1,
-                "focus": f"{exam_name} — Syllabus Overview & Weak Area Identification",
-                "tasks": [
-                    f"Download and read the full {exam_name} syllabus",
-                    "Make a topic-wise checklist",
-                    "Identify your weak vs strong areas",
-                ],
-            },
-        ]
-        # Assign real topics to weeks 2-5
-        topic_chunks = [topics[i:i+3] for i in range(0, min(len(topics), 12), 3)]
-        for idx, chunk in enumerate(topic_chunks, start=2):
-            focus = ", ".join(chunk) if chunk else f"Core subject {idx - 1}"
-            tasks = [
-                f"Study theory and deeply understand {chunk[0]}" if chunk else "Study core theory",
-                f"Practice 30+ problems directly related to {', '.join(chunk)}" if chunk else "Solve 20 MCQs",
-                f"Make short revision notes for {chunk[0]}" if chunk else "Make short revision notes",
-            ]
-            plan.append({
-                "week": idx,
-                "focus": focus,
-                "tasks": tasks,
-            })
-            if idx >= 5:
-                break
-        # Fill remaining weeks generically
-        existing_weeks = {w["week"] for w in plan}
-        for week_num, focus, tasks in [
-            (6, "Full-length Mock Tests", ["Take 2 full-length mock tests", "Analyse mistakes and time management"]),
-            (7, "Revision — Weak Topics", ["Re-study weak topics from week 1 list", "Solve previous year questions"]),
-            (8, f"Final Revision & {exam_name} Strategy", [
-                "Revise all short notes",
-                "Read exam-day instructions and strategy",
-                "Stay calm and confident",
-            ]),
-        ]:
-            if week_num not in existing_weeks:
-                plan.append({"week": week_num, "focus": focus, "tasks": tasks})
-        return sorted(plan, key=lambda x: x["week"])
+        plan: List[dict] = []
 
+        # Split topics across 3 content phases
+        n = len(topics)
+        splits = [0, max(1, n // 3), max(2, 2 * n // 3), n]
+        phase_names = ["Phase 1 — Foundations", "Phase 2 — Core Concepts", "Phase 3 — Advanced Topics"]
+
+        for p_idx, phase in enumerate(phase_names):
+            chunk = topics[splits[p_idx]:splits[p_idx + 1]]
+            for t in chunk:
+                plan.append({
+                    "order":    len(plan) + 1,
+                    "phase":    phase,
+                    "topic":    t,
+                    "subtopics": "",
+                    "duration": "2 Hours",
+                    "tip":      f"Focus on understanding the fundamentals of {t} before solving problems.",
+                })
+
+        # Phase 4: Revision
+        plan.append({
+            "order":    len(plan) + 1,
+            "phase":    "Phase 4 — Revision & Mocks",
+            "topic":    "Full-Length Mock Tests",
+            "subtopics": "Time management, accuracy, speed, error analysis",
+            "duration": "3 Hours",
+            "tip":      "Simulate real exam conditions. Analyse every wrong answer thoroughly.",
+        })
+        plan.append({
+            "order":    len(plan) + 1,
+            "phase":    "Phase 4 — Revision & Mocks",
+            "topic":    "Final Revision",
+            "subtopics": "Quick notes, formulae, key theorems, important definitions",
+            "duration": "2 Hours",
+            "tip":      "Only revise — do not start any new topic in the final phase.",
+        })
+
+        return plan
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Main generator
+    # ──────────────────────────────────────────────────────────────────────────
     def generate_plan(
         self,
         exam_name: str,
@@ -74,100 +85,160 @@ class StudyPlanService:
         weeks: int = 8,
     ) -> List[dict]:
         """
-        Generate a study plan (list of week-wise focus and tasks).
-
-        Args:
-            exam_name: Name of the exam
-            syllabus_summary: Optional short summary of syllabus
-            important_topics: Optional list of important topics
-            weeks: Number of weeks for the plan
+        Generate a phase-wise preparation strategy as a JSON list.
 
         Returns:
-            List of {"week": int, "focus": str, "tasks": List[str]}
+            List of {"order": int, "phase": str, "topic": str,
+                     "subtopics": str, "duration": str, "tip": str}
         """
         llm = self._llm
         if llm is None:
             return self._template_plan(exam_name, important_topics)
 
         try:
-            import datetime as _dt
-            year = _dt.datetime.now().year
-            from langchain_core.prompts import ChatPromptTemplate
-            prompt = ChatPromptTemplate.from_messages([
-                ("system",
-                 f"You are an expert {exam_name} preparation coach for {year}.\n"
-                 "Generate a STRICT 4-week, DAY-WISE study plan using ONLY the syllabus topics provided.\n"
-                 "RULES:\n"
-                 "1. EACH WEEK has exactly 7 daily tasks (Day 1 through Day 7).\n"
-                 "2. Every day's task MUST name a specific topic from the provided syllabus (e.g. 'Day 1: Study Arrays and Linked Lists').\n"
-                 "3. Distribute ALL major syllabus topics across the 4 weeks — cover everything.\n"
-                 "4. Each week has a 'focus' (the main subject area for that week) and a 'tip' (one concise strategy tip).\n"
-                 "5. OUTPUT ONLY a valid JSON array. No markdown, no explanation.\n"
-                 'Format: [{"week":1,"focus":"Subject Area","tip":"Strategy tip","tasks":["Day 1: Task","Day 2: Task",...,"Day 7: Task"]}]'
-                ),
-                ("human", "Exam: {exam_name}\nSyllabus:\n{syllabus}\nKey Topics: {topics}"),
-            ])
-            chain = prompt | llm
+            from langchain_core.messages import SystemMessage, HumanMessage
+
+            system_msg = (
+                f"You are a top-tier exam preparation strategist and coach specialising in {exam_name} ({CURRENT_YEAR}).\n\n"
+                "YOUR MISSION: Build a PRACTICAL, REALISTIC, and EXAM-SPECIFIC preparation strategy.\n\n"
+                "EXAM CONTEXT YOU MUST APPLY:\n"
+                "- Consider whether this exam has Prelims, Mains, Interview stages.\n"
+                "- Weigh subjects by their actual marks distribution and difficulty.\n"
+                "- Assume the student is a BEGINNER unless the exam is highly specialised.\n"
+                "- Base your strategy on what ACTUALLY works for this specific exam (not generic advice).\n\n"
+                "DIVIDE ALL TOPICS INTO EXACTLY FOUR PHASES:\n"
+                "  Phase 1 - Foundations: Prerequisites, basics, easier subjects. Build speed and accuracy here.\n"
+                "  Phase 2 - Core Concepts: Main high-weightage subjects and topics. Deepest study phase.\n"
+                "  Phase 3 - Advanced Topics: High-difficulty, tricky, less-attempted topics. Competitive edge.\n"
+                "  Phase 4 - Revision & Mocks: Full-length mocks, PYQ analysis, rapid revision, weak area targeting.\n\n"
+                "FOR EACH TOPIC IN THE PLAN, PROVIDE:\n"
+                "1. order (int) — global sequential number across all phases\n"
+                "2. phase (str) — exactly one of the four phase names above\n"
+                "3. topic (str) — the subject/topic name\n"
+                "4. subtopics (str) — comma-separated key concepts to cover within this topic\n"
+                "5. duration (str) — realistic time estimate: '45 Minutes', '1.5 Hours', '2 Hours', '3 Hours', etc.\n"
+                "   Base duration on actual difficulty: simple topics = 45 min, complex = 3+ hours.\n"
+                "6. tip (str) — ONE specific, actionable, exam-relevant tip. Examples:\n"
+                "   - 'Solve last 5 years GATE questions on this topic before moving on.'\n"
+                "   - 'Focus on RC passages from Hindu/Indian Express for this section.'\n"
+                "   - 'Use shortcut methods for DI — do not solve full calculations in exam.'\n"
+                "   NEVER write generic tips like 'study hard' or 'practice regularly'.\n\n"
+                "STRATEGY DESIGN RULES:\n"
+                "- Phase 4 MUST include at least 3 entries: Full Mock Test, PYQ Analysis, Final Revision.\n"
+                "- Phase 4 Mock Test tip must mention: exam-like conditions, time management, error analysis.\n"
+                "- Topic order within each phase must be logical: foundational → intermediate → advanced.\n"
+                "- Cover EVERY topic from the given syllabus. Do not skip or merge unrelated topics.\n"
+                "- PYQ (Previous Year Question) mentions: add to tips where relevant (Phase 2, 3, 4).\n\n"
+                "OUTPUT: Raw JSON array ONLY. No markdown fences, no HTML, no asterisks, no commentary.\n"
+                "Schema: [{\"order\": 1, \"phase\": \"Phase 1 - Foundations\", \"topic\": \"...\", "
+                "\"subtopics\": \"...\", \"duration\": \"...\", \"tip\": \"...\"}]\n"
+                "Start with [ and end with ]."
+            )
+
             topics_str = "\n".join([f"- {t}" for t in (important_topics or [])[:40]])
-            response = chain.invoke({
-                "exam_name": exam_name,
-                "syllabus":  (syllabus_summary or topics_str)[:5000],
-                "topics":    topics_str[:2000],
-            })
+            human_msg = (
+                f"EXAM: {exam_name} ({CURRENT_YEAR})\n\n"
+                f"OFFICIAL SYLLABUS:\n{(syllabus_summary or topics_str)[:5000]}\n\n"
+                f"HIGH-WEIGHTAGE / IMPORTANT TOPICS:\n{topics_str[:2000]}\n\n"
+                "Now generate the complete, phase-wise, exam-specific preparation strategy JSON array."
+            )
+
+            response = llm.invoke([SystemMessage(content=system_msg), HumanMessage(content=human_msg)])
             text = response.content if hasattr(response, "content") else str(response)
-            return self._parse_llm_plan(text, exam_name, important_topics, weeks)
+            return self._parse_llm_plan(text, exam_name, important_topics)
+
         except Exception as e:
             logger.warning("LLM study plan failed: %s. Using template.", e)
             return self._template_plan(exam_name, important_topics)
 
-    def _parse_llm_plan(self, text: str, exam_name: str, important_topics: Optional[List[str]], max_weeks: int) -> List[dict]:
-        """Parse LLM JSON output into list of {week, focus, tasks}."""
-        import json
-        import re
-        
-        # Clean up text (strip markdown ```json if present)
-        clean_text = text.strip()
-        clean_text = re.sub(r"^```json\s*", "", clean_text, flags=re.IGNORECASE)
-        clean_text = re.sub(r"^```\s*", "", clean_text)
-        clean_text = re.sub(r"\s*```$", "", clean_text)
-        
-        # Aggressive JSON cleanup for smaller local models
+    # ──────────────────────────────────────────────────────────────────────────
+    # Parser
+    # ──────────────────────────────────────────────────────────────────────────
+    def _parse_llm_plan(
+        self,
+        text: str,
+        exam_name: str,
+        important_topics: Optional[List[str]],
+    ) -> List[dict]:
+        """Parse LLM JSON output into list of phase-wise plan items."""
+
+        clean = text.strip()
+        clean = re.sub(r"^```json\s*", "", clean, flags=re.IGNORECASE)
+        clean = re.sub(r"^```\s*",     "", clean)
+        clean = re.sub(r"\s*```$",     "", clean)
+
         try:
-            # Find the first '[' and last ']'
-            start = clean_text.find('[')
-            end = clean_text.rfind(']')
+            start = clean.find("[")
+            end   = clean.rfind("]")
             if start != -1 and end != -1 and end > start:
-                clean_text = clean_text[start:end+1]
+                clean = clean[start: end + 1]
             elif start != -1:
-                # Missing closing bracket
-                clean_text = clean_text[start:] + "]"
+                clean = clean[start:] + "]"
         except Exception:
             pass
-            
+
+        # Validate known phase names
+        valid_phases = {
+            "Phase 1 — Foundations",
+            "Phase 2 — Core Concepts",
+            "Phase 3 — Advanced Topics",
+            "Phase 4 — Revision & Mocks",
+        }
+
         try:
-            data = json.loads(clean_text)
+            data = json.loads(clean)
             if not isinstance(data, list) or len(data) == 0:
-                raise ValueError("JSON is not a non-empty list")
-            
-            plan = []
-            for item in data:
+                raise ValueError("Not a non-empty list")
+
+            plan: List[dict] = []
+            for idx, item in enumerate(data, start=1):
                 if not isinstance(item, dict):
                     continue
-                week = int(item.get("week", len(plan) + 1))
-                focus = str(item.get("focus", ""))[:200]
-                tasks = [str(t)[:200] for t in item.get("tasks", []) if t][:10]
-                if not focus and not tasks:
+
+                order     = int(item.get("order", idx))
+                phase     = str(item.get("phase", "Phase 1 — Foundations")).strip()
+                topic     = re.sub(r'<[^>]*>', '', str(item.get("topic", ""))).replace('*', '').strip()[:200]
+                subtopics = re.sub(r'<[^>]*>', '', str(item.get("subtopics", "") or "")).replace('*', '').strip()[:400]
+                duration  = re.sub(r'<[^>]*>', '', str(item.get("duration", "2 Hours"))).strip()[:60]
+                tip       = re.sub(r'<[^>]*>', '', str(item.get("tip", "") or "")).replace('*', '').strip()[:500]
+
+                # Normalise phase name to what the UI expects (em-dash variant)
+                pl = phase.lower()
+                if "foundation" in pl:
+                    phase = "Phase 1 — Foundations"
+                elif "core" in pl:
+                    phase = "Phase 2 — Core Concepts"
+                elif "advanced" in pl:
+                    phase = "Phase 3 — Advanced Topics"
+                elif "revision" in pl or "mock" in pl:
+                    phase = "Phase 4 — Revision & Mocks"
+                else:
+                    phase = "Phase 1 — Foundations"
+
+                if not topic:
                     continue
-                if not tasks:
-                    tasks = [focus]
-                plan.append({"week": week, "focus": focus, "tasks": tasks})
-                if len(plan) >= max_weeks:
-                    break
-                    
+
+                plan.append({
+                    "order":     order,
+                    "phase":     phase,
+                    "topic":     topic,
+                    "subtopics": subtopics,
+                    "duration":  duration,
+                    "tip":       tip,
+                })
+
             if plan:
-                return sorted(plan, key=lambda x: x["week"])
+                plan.sort(key=lambda x: x["order"])
+                for i, p in enumerate(plan, start=1):
+                    p["order"] = i
+                logger.info("[StudyPlanService] Parsed %d plan items across phases.", len(plan))
+                return plan
+
             return self._template_plan(exam_name, important_topics)
-            
+
         except Exception as e:
-            logger.warning("Failed to parse LLM JSON output: %s. Text was: %s", e, clean_text[:100])
+            logger.warning(
+                "Failed to parse LLM study plan JSON: %s. Preview: %s",
+                e, clean[:200]
+            )
             return self._template_plan(exam_name, important_topics)
