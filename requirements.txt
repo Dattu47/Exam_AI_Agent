@@ -16,10 +16,11 @@ faiss-cpu>=1.7.4
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
-ddgs>=9.0.0
+html5lib>=1.1
+ddgs>=6.2.0,<9.0.0
 
 # PDF handling
-pypdf==4.0.1
+pypdf>=4.0.0
 
 # Frontend
 streamlit>=1.29.0
