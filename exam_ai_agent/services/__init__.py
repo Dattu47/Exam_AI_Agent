@@ -1,6 +1,6 @@
-"""Services for syllabus, papers, and study plan generation."""
-from .syllabus_service import SyllabusService
+"""Services for authority, papers, and database operations."""
+from .authority_service import AuthorityService
 from .papers_service import PapersService
-from .study_plan_service import StudyPlanService
+from .supabase_service import SupabaseService
 
-__all__ = ["SyllabusService", "PapersService", "StudyPlanService"]
+__all__ = ["AuthorityService", "PapersService", "SupabaseService"]

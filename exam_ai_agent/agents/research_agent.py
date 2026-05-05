@@ -1,127 +1,130 @@
 """
-Research Agent: The Orchestrator.
-Coordinates the specialized agents (Search, Scraping, Processing, StudyPlan, Response)
-and Supabase caching to generate the full exam preparation plan.
+Research Agent: The Orchestrator for Resource Aggregation.
+Coordinates AuthorityService, MaterialAggregator, YoutubeAgent, and PYQ searches.
 """
 
 from typing import Dict, Any
 
+from exam_ai_agent.services.authority_service import AuthorityService
+from exam_ai_agent.agents.material_aggregator import MaterialAggregator
+from exam_ai_agent.agents.youtube_agent import YoutubeAgent
 from exam_ai_agent.agents.search_agent import SearchAgent
-from exam_ai_agent.agents.scraping_agent import ScrapingAgent
-from exam_ai_agent.agents.processing_agent import ProcessingAgent
-from exam_ai_agent.agents.study_plan_agent import StudyPlanAgent
-from exam_ai_agent.agents.response_agent import ResponseAgent
 from exam_ai_agent.services.supabase_service import SupabaseService
 from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 class ResearchAgent:
-    """
-    Main Orchestrator Agent. 
-    Intercepts cached database results to save time, or runs the full multi-agent pipeline if missing.
-    """
-
     def __init__(self):
-        # Initialize Sub-Agents
+        # Initialize Sub-Agents/Services
+        self.authority_service = AuthorityService()
+        self.material_aggregator = MaterialAggregator()
+        self.youtube_agent = YoutubeAgent()
         self.search_agent = SearchAgent()
-        self.scraping_agent = ScrapingAgent()
-        self.processing_agent = ProcessingAgent()
-        self.study_agent = StudyPlanAgent()
-        self.response_agent = ResponseAgent()
-        self.vector_store = self.response_agent.vector_store  # expose for chatbot
         
         # Initialize Supabase
         self.db = SupabaseService()
 
     def research_exam(self, exam_name: str, force_refresh: bool = False) -> Dict[str, Any]:
         """
-        Full orchestration pipeline.
-        
-        Args:
-            exam_name: Name of the exam (e.g., "GATE CSE")
-            force_refresh: Ignore cache and re-scrape
+        Full orchestration pipeline for Resource Aggregation.
         """
         logger.info("========================================")
-        logger.info("[Orchestrator] Beginning research for: %s", exam_name)
+        logger.info("[Orchestrator] Beginning Resource Aggregation for: %s", exam_name)
         
-        # 0. Log user query logic
         self.db.save_user_query(exam_name)
         
-        # 1. Check Supabase Cache
         if not force_refresh:
             cached_data = self.db.get_exam_resources(exam_name)
             if cached_data:
                 logger.info("[Orchestrator] Cache hit! Returning saved data for %s", exam_name)
                 return cached_data
 
-        result = {
-            "syllabus": [],
-            "previous_papers": [],
-            "important_topics": [],
-            "study_plan": [],
-            "resources": [],
+        # 1. Authority Info
+        authority_data = self.authority_service.get_authority_info(exam_name)
+        
+        # 2. PYQ Archive (Using search agent for PYQs)
+        search_grouped = self.search_agent.find_resources(exam_name)
+        pyqs = search_grouped.get("previous_papers", [])
+        archive = []
+        for p in pyqs[:15]:
+            title = p.title if hasattr(p, "title") else p.get("title", "")
+            url = p.url if hasattr(p, "url") else p.get("url", "")
+            snippet = p.snippet if hasattr(p, "snippet") else p.get("snippet", "")
+            archive.append({"title": title, "url": url, "snippet": snippet})
+        
+        # Deduplicate PYQs by url and filter relevance using Gemini
+        seen = set()
+        dedup_archive = []
+        for p in archive:
+            if p["url"] and p["url"] not in seen:
+                if self.material_aggregator._is_url_alive(p["url"]):
+                    dedup_archive.append(p)
+                    seen.add(p["url"])
+                    
+        # Apply LLM filtering to PYQs if we have Gemini available
+        llm = self.material_aggregator.llm
+        if llm and dedup_archive:
+            import json
+            prompt = f"""
+            You are an expert educational content curator.
+            Exam: {exam_name}
+            
+            Previous Year Question (PYQ) Candidates:
+            {json.dumps(dedup_archive[:10], indent=2)}
+            
+            Task:
+            Filter the list to ONLY include authentic and highly relevant PYQ paper links.
+            
+            CRITICAL ACCURACY RULE:
+            - If a link is NOT specifically a PYQ/Mock paper for the exam "{exam_name}", strictly REMOVE it.
+            - If there are no highly relevant links, return an empty array `[]`.
+            
+            Return ONLY valid JSON in this format:
+            [
+                {{"title": "...", "url": "...", "snippet": "..."}},
+                ...
+            ]
+            """
+            try:
+                from langchain_core.messages import SystemMessage, HumanMessage
+                res = llm.invoke([
+                    SystemMessage(content="Output ONLY raw JSON."),
+                    HumanMessage(content=prompt)
+                ])
+                text = res.content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+                start = text.find("[")
+                end = text.rfind("]") + 1
+                if start != -1 and end > start:
+                    text = text[start:end]
+                dedup_archive = json.loads(text)
+            except Exception as e:
+                logger.error(f"[Orchestrator] PYQ LLM filter failed: {e}")
+        
+        
+        # 3. Video Library
+        videos = self.youtube_agent.get_top_playlists(exam_name)
+        
+        # 4. Study Materials (Drive + Books)
+        materials = self.material_aggregator.aggregate_materials(exam_name)
+
+        final_response = {
+            "authority": authority_data,
+            "archive": dedup_archive[:10],
+            "videos": videos,
+            "library": materials
         }
 
-        # 2. SEARH AGENT
-        try:
-            search_grouped = self.search_agent.find_resources(exam_name)
-        except Exception as e:
-            logger.exception("Search Agent failed: %s", e)
-            result["error"] = f"Search failed: {e}"
-            return result
-
-        syllabus_results = search_grouped.get("syllabus", [])
-        papers_results = search_grouped.get("previous_papers", [])
-        pattern_results = search_grouped.get("exam_pattern", [])
-        study_results = search_grouped.get("study_resources", [])
-        youtube_results = search_grouped.get("youtube_lectures", [])
-        info_results = search_grouped.get("exam_info", [])
-
-        # Gather target URLs
-        syllabus_urls = [(r.url if hasattr(r, "url") else r.get("url", "")) for r in syllabus_results[:10]]
-        paper_page_urls = [(r.url if hasattr(r, "url") else r.get("url", "")) for r in papers_results[:3]]
-
-        # 3. SCRAPING AGENT
-        scraped_pages, hidden_pdfs = self.scraping_agent.scrape_sources(syllabus_urls + paper_page_urls, max_pages=8)
-
-        # 4. PROCESSING AGENT
-        scraped_syllabus_items, important_topics, raw_text_chunks = self.processing_agent.extract_and_process(
-            exam_name, scraped_pages, syllabus_urls, pattern_results
-        )
-
-        # 5. STUDY PLAN AGENT
-        study_plan = self.study_agent.build_plan(exam_name, scraped_syllabus_items, important_topics, weeks=4)
-
-        # 6. RESPONSE AGENT
-        final_response = self.response_agent.format_final_response(
-            exam_name,
-            info_results,
-            syllabus_results,
-            papers_results,
-            study_results,
-            youtube_results,
-            scraped_syllabus_items,
-            important_topics,
-            study_plan,
-            hidden_pdfs,
-            raw_text_chunks
-        )
-
-        # 7. CACHING: Only save to Supabase if the result has meaningful content.
-        # Never overwrite good cached data with empty results caused by e.g. Groq rate limits.
+        # CACHING
         has_content = (
-            bool(final_response.get("syllabus")) or
-            bool(final_response.get("previous_papers")) or
-            bool(final_response.get("resources"))
+            bool(final_response.get("authority", {}).get("official_site")) or
+            bool(final_response.get("archive")) or
+            bool(final_response.get("library", {}).get("drive_links"))
         )
         if has_content:
             self.db.save_exam_resources(exam_name, final_response)
-            if study_plan:
-                self.db.save_study_plan(exam_name, study_plan)
         else:
-            logger.warning("[Orchestrator] Skipping Supabase save — result has no content (likely rate-limited).")
+            logger.warning("[Orchestrator] Skipping Supabase save — result has no content.")
 
         logger.info("[Orchestrator] Finished research pipeline for %s", exam_name)
         return final_response

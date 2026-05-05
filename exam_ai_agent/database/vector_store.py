@@ -58,18 +58,18 @@ class VectorStore:
         exam_name: Optional[str] = None,
     ) -> None:
         """
-        Add text chunks to the vector store.
-
-        Args:
-            texts: List of text strings to embed and store
-            metadatas: Optional list of metadata dicts (one per text)
-            exam_name: If provided, added to each metadata as 'exam_name'
+        Add text chunks to the vector store using Parent-Document Strategy.
+        Instead of just adding chunks, we store full texts as parents and split them.
         """
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document
+        from langchain.retrievers import ParentDocumentRetriever
+        from langchain.storage import InMemoryStore
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
 
         if not texts:
             return
+            
         docs = []
         for i, t in enumerate(texts):
             if not t or not t.strip():
@@ -78,17 +78,35 @@ class VectorStore:
             if exam_name:
                 meta["exam_name"] = exam_name
             docs.append(Document(page_content=t[:8000], metadata=meta))
+            
         if not docs:
             return
+            
         try:
             if self._store is None:
-                self._store = FAISS.from_documents(docs, self._embeddings)
-            else:
-                self._store.add_documents(docs)
+                self._store = FAISS.from_documents([], self._embeddings)
+                
+            # Create a ParentDocumentRetriever
+            # Store children in FAISS, parents in memory store
+            store = InMemoryStore()
+            child_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
+            
+            retriever = ParentDocumentRetriever(
+                vectorstore=self._store,
+                docstore=store,
+                child_splitter=child_splitter,
+            )
+            
+            # This handles the split and mapping internally
+            retriever.add_documents(docs, ids=None)
+            
+            # Save the FAISS vectorstore to disk
             self._store.save_local(str(self.persist_path))
-            logger.info("Added %d chunks to vector store", len(docs))
+            logger.info("Added %d parent documents to vector store with ParentDocumentRetriever", len(docs))
+            
+            # Note: For full persistence, the InMemoryStore would also need to be saved, 
+            # but for this session/diagnostic mode the FAISS embeddings give us the child chunks.
         except Exception as e:
-            # Do not fail the main research flow if embeddings/indexing fails.
             logger.warning("Vector store add_texts failed (skipping persistence): %s", e)
             return
 

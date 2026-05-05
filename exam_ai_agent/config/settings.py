@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment or .env file."""
 
     # LLM Configuration
-    LLM_MODEL: str = Field(default="llama3-70b-8192", description="Model name for Groq LLM")
+    LLM_MODEL: str = Field(default="gemini-1.5-pro", description="Model name for Gemini LLM")
     LLM_TIMEOUT: int = Field(default=120, description="Timeout in seconds for LLM calls")
 
     # Search & Scraping

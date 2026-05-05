@@ -45,26 +45,33 @@ class PDFDownloaderTool:
         return list({u for u in urls if self.is_pdf_url(u)})
 
     def extract_pdf_links_from_html(self, html: str, base_url: str) -> List[str]:
-        """
-        Extract all PDF links from an HTML string.
-
-        Args:
-            html: Raw HTML content
-            base_url: Base URL for resolving relative links
-
-        Returns:
-            List of absolute PDF URLs
-        """
         from bs4 import BeautifulSoup
-
+        import requests
+        from urllib.parse import urljoin
+        
         soup = BeautifulSoup(html, "html.parser")
         links = []
+        possible_redirects = []
+        
         for a in soup.find_all("a", href=True):
             href = a["href"].strip()
+            full = urljoin(base_url, href)
+            if not full.startswith(("http://", "https://")): continue
+            
             if self.PDF_EXTENSION.search(href) or "pdf" in href.lower():
-                full = urljoin(base_url, href)
-                if full.startswith(("http://", "https://")):
-                    links.append(full)
+                links.append(full)
+            elif "download" in href.lower() or "paper" in href.lower():
+                possible_redirects.append(full)
+                
+        # 1-level deep recursive check for possible redirects
+        for redirect_url in possible_redirects[:3]: # limit to avoid hanging
+            try:
+                res = requests.head(redirect_url, timeout=3, allow_redirects=True)
+                if "application/pdf" in res.headers.get("Content-Type", "") or self.is_pdf_url(res.url):
+                    links.append(res.url)
+            except Exception:
+                pass
+                
         return list(dict.fromkeys(links))
 
     def get_pdf_links_from_search_results(self, search_results: List[dict]) -> List[dict]:

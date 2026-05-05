@@ -135,3 +135,40 @@ class SupabaseService:
         except Exception as e:
             logger.error("Error retrieving exam resources from database: %s", e)
             return None
+
+    def save_task_checklist(self, exam_name: str, checklist: Dict[str, bool]) -> bool:
+        """Save the daily task checklist state to the study_plans table."""
+        if not self.is_connected():
+            return False
+        try:
+            # Upsert partial data (plan_data might get overwritten if we aren't careful, 
+            # but standard upsert in Supabase overwrites the whole row unless we use an RPC or fetch first.
+            # To be safe, fetch existing plan first)
+            clean_name = exam_name.lower().strip()
+            res = self.client.table("study_plans").select("plan_data").eq("exam_name", clean_name).execute()
+            plan_data = res.data[0]["plan_data"] if res.data else {}
+            
+            data = {
+                "exam_name": clean_name,
+                "plan_data": plan_data,
+                "task_checklist": checklist
+            }
+            self.client.table("study_plans").upsert(data, on_conflict="exam_name").execute()
+            return True
+        except Exception as e:
+            logger.warning("Failed to save task checklist: %s", e)
+            return False
+
+    def get_task_checklist(self, exam_name: str) -> Dict[str, bool]:
+        """Get the saved task checklist state."""
+        if not self.is_connected():
+            return {}
+        try:
+            clean_name = exam_name.lower().strip()
+            res = self.client.table("study_plans").select("task_checklist").eq("exam_name", clean_name).execute()
+            if res.data and "task_checklist" in res.data[0]:
+                return res.data[0]["task_checklist"] or {}
+            return {}
+        except Exception as e:
+            logger.error("Error retrieving checklist: %s", e)
+            return {}
