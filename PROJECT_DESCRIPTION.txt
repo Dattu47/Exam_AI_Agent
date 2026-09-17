@@ -1,0 +1,324 @@
+================================================================================
+           EXAMGENIE AI — PROJECT OVERVIEW & ARCHITECTURE SPECIFICATION
+================================================================================
+
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+ExamGenie AI is an intelligent, multi-agent exam research and resource 
+aggregation system tailored for competitive examinations (such as GATE, UPSC, 
+JEE, SSC, State PSCs, Banking exams, and university tests). 
+
+The fundamental problem ExamGenie solves:
+Students preparing for competitive exams waste hours searching through 
+unreliable third-party blogs, clickbait portals, broken links, outdated 
+syllabi, and commercial advertising. 
+
+ExamGenie AI solves this by deploying specialized AI agents that autonomously:
+1. Identify and verify the SINGLE authentic official government/conducting 
+   body portal and official syllabus document.
+2. Discover and curate direct Previous Year Question (PYQ) paper downloads 
+   and authentic solved papers while stripping away blog spam.
+3. Find, evaluate, and categorize high-quality YouTube lecture courses and 
+   topic playlists by difficulty level and syllabus topics.
+4. Aggregate verified study materials from top educational platforms and 
+   recommended reference books.
+5. Cache compiled knowledge into a persistence layer so repeated searches 
+   for the same examination return instantly.
+
+
+================================================================================
+2. END-TO-END WORKFLOW (HOW IT WORKS)
+================================================================================
+
+Stage 1: User Query Reception & Frontend State
+----------------------------------------------
+- The user launches the application via the Streamlit interface (app.py).
+- The user types the target exam name (e.g., "GATE CSE", "UPSC Prelims", "JEE Advanced").
+- The user can optionally choose to bypass the database cache using the 
+  "Bypass Cache (Force Live Refresh)" toggle.
+- When the user hits "Search", the execution pipeline triggers.
+
+Stage 2: Orchestration & Cache Validation
+-----------------------------------------
+- The Master Orchestrator (ResearchAgent) logs the incoming query.
+- If force_refresh is false, it queries the persistence layer (SupabaseService).
+- CACHE HIT: If comprehensive resource data already exists in the database, 
+  the cached JSON payload is returned immediately (< 1 second response time).
+- CACHE MISS: If no cached data exists or if forced refresh is enabled, the 
+  multi-agent research engine initiates full parallel execution.
+
+Stage 3: Parallel Multi-Agent Execution
+---------------------------------------
+Rather than running in a slow sequential sequence, the ResearchAgent dispatches 
+four independent sub-agents concurrently across a thread pool:
+
+  [ResearchAgent Orchestrator]
+       |
+       +---> [AuthorityService]       --> Fact-checks official site & syllabus PDF
+       +---> [SearchAgent]            --> Gathers PYQ papers & exam pattern links
+       +---> [YoutubeAgent]           --> Discovers & categorizes video lecture courses
+       +---> [MaterialAggregator]     --> Curates verified EdTech platforms & books
+
+Stage 4: Deep Validation, Fact-Checking & Filtering
+---------------------------------------------------
+- URL Liveness Check: Any URLs discovered by search queries are pinged 
+  concurrently to ensure no dead or broken links reach the student.
+- Official Fact-Checking: AuthorityService scrapes candidate pages and uses 
+  the Gemini LLM to extract the official conducting body, registration window, 
+  frequency, and notification status.
+- PYQ Relevance Filtering: SearchAgent's raw candidate papers pass through an 
+  LLM relevance filter to remove unrelated tests and generic blog posts.
+- Video Categorization: YoutubeAgent inspects playlists and classifies them 
+  into structured tiers (e.g. "Foundation/Beginner", "Full Course", "PYQ Solving").
+
+Stage 5: Result Assembly, Caching & UI Rendering
+------------------------------------------------
+- ResearchAgent compiles the results into a unified data structure containing 
+  four distinct sections: Authority, Archive, Videos, and Library.
+- If meaningful resources were extracted, the result is saved to the database.
+- The Streamlit UI receives the payload and populates four interactive tabs:
+    * Tab 1: 🏛️ Authority (Official Fact-Checker, Verified Badges, Quick Info)
+    * Tab 2: 📄 Archive (Previous Year Question papers & PDF direct links)
+    * Tab 3: 🎥 Video Library (Curated playlists with level tags)
+    * Tab 4: 📚 Library & Verified Portals (EdTech resources & recommended books)
+
+
+================================================================================
+3. DETAILED BREAKDOWN OF AGENTS
+================================================================================
+
+1. ResearchAgent (exam_ai_agent/agents/research_agent.py)
+---------------------------------------------------------
+- Role: Master Controller and Pipeline Coordinator.
+- Responsibilities:
+  * Manages the lifecycle of an exam research request.
+  * Coordinates cache lookups and writes with SupabaseService.
+  * Spawns worker threads to execute AuthorityService, SearchAgent, 
+    YoutubeAgent, and MaterialAggregator concurrently.
+  * Executes concurrent URL health validation on PYQ candidates.
+  * Invokes LLM relevance filtering to ensure candidate papers match the exam.
+  * Packages clean, validated output for consumption by the frontend.
+
+2. AuthorityService (exam_ai_agent/services/authority_service.py)
+-----------------------------------------------------------------
+- Role: Official Fact-Checker & Authority Discovery.
+- Responsibilities:
+  * Generates authoritative search queries focused on government and institutional 
+    domains (.nic.in, .gov.in, .ac.in).
+  * Generates heuristic domain guesses (e.g., gate.iitk.ac.in, upsc.gov.in) and 
+    pings them concurrently to identify live official portals.
+  * Scrapes text from top candidates with SSL tolerance for state/central portals.
+  * Uses Gemini LLM to identify the single most official portal, verify the 
+    conducting body (e.g. NTA, IIT, UPSC), determine exam frequency, detect 
+    recent announcements/updates, and provide an executive "About Exam" brief.
+
+3. SearchAgent (exam_ai_agent/agents/search_agent.py)
+----------------------------------------------------
+- Role: Multi-Domain Search Engine Interface.
+- Responsibilities:
+  * Utilizes specialized query templates targeting syllabus breakdown, 
+    past question papers, marking patterns, and book lists.
+  * Returns categorized search results (syllabus, previous_papers, exam_pattern, 
+    study_resources, youtube_lectures) for pipeline processing.
+
+4. YoutubeAgent (exam_ai_agent/agents/youtube_agent.py)
+------------------------------------------------------
+- Role: Video Lecture & Course Curator.
+- Responsibilities:
+  * Constructs targeted YouTube search queries filtering for top Indian educational 
+    creators (Unacademy, Physics Wallah, StudyIQ, Gate Smashers, Neso Academy, etc.).
+  * Validates that discovered links are legitimate YouTube playlist or video links.
+  * Uses the LLM to inspect candidates, discard irrelevant videos, categorize 
+    playlists by difficulty or topic, and generate clean one-line descriptions.
+
+5. MaterialAggregator (exam_ai_agent/agents/material_aggregator.py)
+------------------------------------------------------------------
+- Role: Educational Portal & Book Curator.
+- Responsibilities:
+  * Searches top verified academic platforms (NPTEL, Shiksha, Testbook, PW, 
+    NCERT, VisionIAS, etc.).
+  * Performs concurrent URL health validation to drop dead or paywalled links.
+  * Curates a balanced collection of standard reference books and top mock 
+    test series recommended by toppers.
+
+6. ScrapingAgent (exam_ai_agent/agents/scraping_agent.py)
+--------------------------------------------------------
+- Role: Deep HTML Extraction & Document Discovery Engine.
+- Responsibilities:
+  * Provides multi-engine web scraping (fast BeautifulSoup4 + lxml primary, 
+    Crawl4AI async crawler fallback for heavy JavaScript-rendered sites).
+  * Inspects raw HTML before text stripping to discover hidden PDF links, 
+    deep download anchors, and document links.
+  * Implements extract_pdf_text using pdfplumber to parse text and tables from 
+    downloaded exam papers, with file size safety caps to avoid memory spikes.
+  * Extracts YouTube video metadata (channel, duration, title) using yt-dlp.
+
+
+================================================================================
+4. DETAILED BREAKDOWN OF TOOLS & SERVICES
+================================================================================
+
+1. WebSearchTool (exam_ai_agent/tools/web_search.py)
+----------------------------------------------------
+- The core search utility powering all agents.
+- Primary engine: DuckDuckGo (via ddgs / duckduckgo-search).
+- Secondary fallback: Google Search.
+- Contains 6 specialized query generators (syllabus, pyq, youtube, books, 
+  official site, topic deep-dive).
+- Normalizes URLs, stripping marketing trackers (utm_*, fbclid) and 
+  canonicalizing YouTube links (converting youtu.be to youtube.com/watch).
+- Employs canonical URL deduplication so identical resources are never repeated.
+
+2. WebScraperTool (exam_ai_agent/tools/web_scraper.py)
+------------------------------------------------------
+- Handles parallel HTTP fetching with pooled connections (requests.adapters.HTTPAdapter).
+- Uses lxml for high-speed HTML parsing and text sanitation.
+- Implements SSL-error fallback for government websites with self-signed or 
+  expired certificates.
+- Enforces worker count boundaries to eliminate zero-worker threading errors.
+
+3. PDFDownloaderTool (exam_ai_agent/tools/pdf_downloader.py)
+------------------------------------------------------------
+- Detects and filters direct PDF URLs using regex matching (.pdf, export=download).
+- Concurrently resolves ambiguous redirect download links using lightweight 
+  HEAD requests with browser User-Agent headers.
+- Extracts clean PDF links from both raw HTML documents and search result lists.
+
+4. YouTubeTimestampsTool (exam_ai_agent/tools/youtube_timestamps.py)
+--------------------------------------------------------------------
+- Uses youtube-transcript-api to extract video transcripts.
+- Concurrently searches transcripts for syllabus topic keywords across multiple 
+  videos simultaneously.
+- Generates timestamped deep links (e.g., https://youtube.com/watch?v=...&t=142s) 
+  so students can jump straight to the relevant lecture segment.
+- Supports multilingual Indian exam content (English, Hindi, Hinglish, auto-generated).
+
+5. PapersService (exam_ai_agent/services/papers_service.py)
+-----------------------------------------------------------
+- Specializes in assembling Previous Year Question paper links.
+- Uses keyword validation (paper, pyq, question, previous year, solved, shift, mock) 
+  to eliminate generic blog posts and ensure only genuine paper links are kept.
+- Prioritizes direct downloadable PDFs over standard web links.
+
+6. SupabaseService (exam_ai_agent/services/supabase_service.py)
+---------------------------------------------------------------
+- Database integration layer using Supabase PostgreSQL.
+- Provides table schemas for:
+    * exam_resources: Upserts and retrieves cached research payloads by exam name.
+    * user_queries: Logs user exam search queries for usage tracking.
+    * study_plans: Stores generated preparation roadmaps and checklists.
+- Incorporates DNS reachability pre-checks with a strict 3-second socket timeout 
+  so offline networks or DNS timeouts never freeze the application.
+
+7. VectorStore (exam_ai_agent/database/vector_store.py)
+-------------------------------------------------------
+- FAISS-backed semantic search database.
+- Uses ResilientEmbeddings: attempts Google Generative AI embeddings and gracefully 
+  falls back to in-memory deterministic embeddings to ensure zero runtime crashes.
+- Employs RecursiveCharacterTextSplitter for coherent chunking (1000 characters, 
+  150 overlap) with rich metadata tagging.
+- Automatically handles index recreation in the event of embedding dimension updates.
+
+
+================================================================================
+5. SHARED UTILITIES & CONFIGURATION
+================================================================================
+
+1. Settings (exam_ai_agent/config/settings.py)
+----------------------------------------------
+- Centralized configuration using Pydantic BaseSettings.
+- Resolves Gemini API keys and Supabase credentials automatically from .env 
+  files, environment variables, or Streamlit secrets (st.secrets).
+- Manages global constants: LLM model names, timeouts, user-agent strings, 
+  FAISS persist directories, and scraping thread limits.
+
+2. Common Utilities (exam_ai_agent/utils/common.py)
+---------------------------------------------------
+- get_llm(): Factory function returning configured ChatGoogleGenerativeAI instances.
+- strip_json_fences(): Sanitizes LLM outputs by removing markdown fences (```json) 
+  and safely extracting isolated JSON arrays or objects.
+- invoke_llm_with_retry(): Robust LLM invocation engine with exponential backoff 
+  for handling transient API quotas (429 RESOURCE_EXHAUSTED) or rate limits.
+- check_url_alive(): Fast HEAD/GET URL liveness checker with SSL fallback.
+- filter_alive_urls_concurrent(): High-speed parallel URL validator that filters 
+  out broken links across 8-10 worker threads simultaneously.
+
+3. Logger (exam_ai_agent/utils/logger.py)
+-----------------------------------------
+- Unified application logging module with timestamp formatting and propagation 
+  controls to prevent duplicated console outputs.
+
+
+================================================================================
+6. FRONTEND APPLICATION (app.py)
+================================================================================
+
+- Built on Streamlit with a custom scientific dark theme using CSS tokens:
+  --bg: #030508, --surface: #0A0F1A, --accent: #00FFA3, --accent2: #5B96F7.
+- Features:
+  * Persistent session state tracking active exam queries and updated timestamps.
+  * Real-time status container displaying live multi-agent progress indicators.
+  * Sidebar control with active exam badges, update timestamps, and a 
+    "Bypass Cache (Force Live Refresh)" checkbox.
+  * Safe HTML rendering using html.escape to prevent malformed text snippets 
+    from breaking layout cards.
+  * Four structured display tabs:
+      1. Authority Tab: Verified official portal, syllabus download, conducting 
+         body metadata, exam frequency, and live notification ticker.
+      2. Archive Tab: PDF and web badges for previous question papers.
+      3. Video Library Tab: Two-column grid of curated video courses and playlists.
+      4. Library Tab: Educational platforms and topper-recommended book lists.
+
+
+================================================================================
+7. COMPLETE FILE STRUCTURE MAP
+================================================================================
+
+d:\exam-ai-agent
+│
+├── app.py                             # Streamlit frontend UI and tab presentations
+├── requirements.txt                   # Project package dependencies
+├── .env                               # Environment secrets (GEMINI_API_KEY, SUPABASE_*)
+├── README.md                          # Repository summary documentation
+├── PROJECT_DESCRIPTION.txt            # Complete project & file specification (this file)
+│
+└── exam_ai_agent/                     # Core application package
+    ├── __init__.py                    # Package initializer
+    │
+    ├── config/                        # Configuration layer
+    │   ├── __init__.py
+    │   └── settings.py                # Pydantic settings & secrets resolution
+    │
+    ├── database/                      # Knowledge & vector storage
+    │   ├── __init__.py
+    │   └── vector_store.py            # FAISS vector store with resilient embeddings
+    │
+    ├── services/                      # Higher-level domain services
+    │   ├── __init__.py
+    │   ├── authority_service.py       # Official portal & syllabus verification
+    │   ├── papers_service.py          # PYQ paper structuring & keyword filtering
+    │   └── supabase_service.py        # Database caching & query persistence
+    │
+    ├── tools/                         # Web, search, and extraction tools
+    │   ├── __init__.py
+    │   ├── web_search.py              # Search engine wrapper (DDG + Google)
+    │   ├── web_scraper.py             # Parallel HTML scraper with lxml
+    │   ├── pdf_downloader.py          # PDF link detection & redirect resolution
+    │   └── youtube_timestamps.py      # Video transcript & timestamp extractor
+    │
+    ├── agents/                        # Autonomous AI agents
+    │   ├── __init__.py
+    │   ├── research_agent.py          # Master parallel orchestrator
+    │   ├── search_agent.py            # Search query coordinator
+    │   ├── youtube_agent.py           # Video course curation agent
+    │   ├── material_aggregator.py     # Educational platforms & books agent
+    │   └── scraping_agent.py          # Deep scraping & PDF discovery agent
+    │
+    └── utils/                         # Shared helpers
+        ├── __init__.py
+        ├── logger.py                  # Thread-safe logging configuration
+        └── common.py                  # LLM invocation, JSON, & URL liveness utilities
+
+================================================================================
+END OF SPECIFICATION
+================================================================================

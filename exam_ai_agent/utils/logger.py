@@ -1,16 +1,12 @@
 """
 Logging configuration for the application.
-Provides consistent logging across all modules.
+Provides consistent, thread-safe logging across all modules.
 """
 
 import logging
 import sys
-from pathlib import Path
 
-try:
-    from exam_ai_agent.config import settings
-except ImportError:
-    from ..config import settings
+from exam_ai_agent.config import settings
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -36,4 +32,5 @@ def get_logger(name: str) -> logging.Logger:
     )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    logger.propagate = False
     return logger

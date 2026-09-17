@@ -1,48 +1,58 @@
 """
-Web scraping tool using BeautifulSoup and Requests.
-Scrapes pages in parallel threads to avoid sequential blocking waits.
+Web scraping tool using BeautifulSoup, lxml, and Requests.
+Scrapes pages in parallel threads with pooled connections and SSL fallback.
 """
 
 import re
+import urllib3
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional
-from urllib.parse import urljoin, urlparse
+from typing import List, Optional, Dict, Any
 
 import requests
+from requests.adapters import HTTPAdapter
 from bs4 import BeautifulSoup
 
 from exam_ai_agent.config import settings
 from exam_ai_agent.utils.logger import get_logger
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = get_logger(__name__)
 
 
 class WebScraperTool:
     """
     Scrapes web pages and extracts clean text content.
-    Uses thread-parallel fetching to avoid sequential blocking.
+    Uses thread-parallel fetching with HTTP connection pooling.
     """
 
     def __init__(
         self,
         timeout: Optional[int] = None,
         user_agent: Optional[str] = None,
-        max_content_length: int = 80_000,
+        max_content_length: int = 100_000,
     ):
-        # Use a shorter timeout (8s) — slow sites aren't worth waiting for
-        self.timeout = timeout or min(settings.REQUEST_TIMEOUT, 8)
+        self.timeout = timeout or settings.REQUEST_TIMEOUT
         self.user_agent = user_agent or settings.USER_AGENT
         self.max_content_length = max_content_length
-        # Thread-safe: create a session per instance, headers set once
+
         self.session = requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=settings.SCRAPER_MAX_WORKERS * 2,
+            pool_maxsize=settings.SCRAPER_MAX_WORKERS * 2,
+            max_retries=1,
+        )
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
         self.session.headers.update({
             "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-IN,en;q=0.9",
         })
 
     def fetch_url(self, url: str) -> Optional[str]:
-        """Fetch raw HTML from a URL. Returns None on any error."""
+        """Fetch raw HTML from a URL. Returns None on error."""
+        if not url or not url.startswith(("http://", "https://")):
+            return None
         try:
             resp = self.session.get(url, timeout=self.timeout, allow_redirects=True)
             resp.raise_for_status()
@@ -50,61 +60,78 @@ class WebScraperTool:
             if len(content) > self.max_content_length:
                 content = content[: self.max_content_length]
             return content
+        except requests.exceptions.SSLError:
+            # Fallback for government sites with certificate chain issues
+            try:
+                resp = self.session.get(url, timeout=self.timeout, allow_redirects=True, verify=False)
+                if resp.status_code < 400:
+                    return resp.text[: self.max_content_length]
+            except Exception:
+                pass
+            return None
         except requests.RequestException as e:
-            logger.warning("Failed to fetch %s: %s", url, e)
+            logger.debug("Failed to fetch %s: %s", url[:60], e)
             return None
 
-    def extract_text(self, html: str, url: str = "") -> str:
-        """Extract clean readable text from HTML."""
+    def extract_text(self, html: str) -> str:
+        """Extract clean readable text from HTML using lxml or html.parser."""
         if not html or not html.strip():
             return ""
 
-        soup = BeautifulSoup(html, "html.parser")
+        try:
+            soup = BeautifulSoup(html, "lxml")
+        except Exception:
+            soup = BeautifulSoup(html, "html.parser")
 
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript", "svg"]):
             tag.decompose()
 
         text = soup.get_text(separator="\n")
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         text = "\n".join(lines)
-        text = re.sub(r"\n{3,}", "\n\n", text)
-        return text.strip()
+        return re.sub(r"\n{3,}", "\n\n", text).strip()
 
-    def scrape_page(self, url: str) -> Optional[dict]:
-        """Fetch a URL and return extracted text + raw HTML dict."""
+    def scrape_page(self, url: str) -> Optional[Dict[str, str]]:
+        """Fetch a URL and return {html, text} dict, or None on failure."""
         html = self.fetch_url(url)
         if html is None:
             return None
-        return {"html": html, "text": self.extract_text(html, url)}
+        return {"html": html, "text": self.extract_text(html)}
 
-    def _scrape_one(self, url: str) -> Optional[dict]:
-        """Worker for parallel scraping."""
+    def _scrape_one(self, url: str) -> Optional[Dict[str, str]]:
+        """Worker used by the thread pool."""
         result = self.scrape_page(url)
-        if result:
-            logger.debug("Scraped %s (%d chars)", url, len(result["text"]))
+        if result and result.get("text"):
+            logger.debug("Scraped %s (%d chars)", url[:60], len(result["text"]))
             return {"url": url, "text": result["text"], "html": result["html"]}
         return None
 
-    def scrape_urls(self, urls: List[str], max_pages: Optional[int] = None) -> List[dict]:
+    def scrape_urls(self, urls: List[str], max_pages: Optional[int] = None) -> List[Dict[str, str]]:
         """
-        Scrape multiple URLs IN PARALLEL (thread pool).
-        Returns list of {url, text, html} dicts for successful fetches.
+        Scrape multiple URLs IN PARALLEL using thread pool.
+        Returns list of {url, text, html} dicts for successful fetches in original order.
         """
         limit = max_pages or settings.MAX_SCRAPE_PAGES
-        target = urls[:limit]
+        target = [u for u in urls if u and u.startswith(("http://", "https://"))][:limit]
+
+        if not target:
+            return []
 
         results = []
-        with ThreadPoolExecutor(max_workers=min(len(target), 6)) as executor:
+        max_workers = min(len(target), settings.SCRAPER_MAX_WORKERS)
+        if max_workers < 1:
+            return []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(self._scrape_one, url): url for url in target}
-            for future in as_completed(futures, timeout=30):
+            for future in as_completed(futures, timeout=self.timeout * 3):
                 try:
-                    data = future.result(timeout=12)
+                    data = future.result(timeout=self.timeout + 2)
                     if data:
                         results.append(data)
                 except Exception as e:
-                    logger.warning("Scrape future failed for %s: %s", futures[future], e)
+                    logger.debug("Scrape worker failed for %s: %s", futures.get(future, "url")[:60], e)
 
-        # Preserve original URL order for consistent processing
         url_order = {url: i for i, url in enumerate(target)}
         results.sort(key=lambda x: url_order.get(x["url"], 999))
         return results
