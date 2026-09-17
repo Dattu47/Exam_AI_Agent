@@ -5,7 +5,6 @@ Central place for all configurable parameters.
 
 import os
 from pathlib import Path
-from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = Field(default="", description="Supabase API key")
 
     # LLM Configuration
-    LLM_MODEL: str = Field(default="gemini-2.0-flash", description="Model name for Gemini LLM")
+    LLM_MODEL: str = Field(default="gemini-2.5-flash", description="Model name for Gemini LLM")
     LLM_TIMEOUT: int = Field(default=60, description="Timeout in seconds for LLM calls")
     LLM_TEMPERATURE: float = Field(default=0.1, description="Sampling temperature for LLM")
 

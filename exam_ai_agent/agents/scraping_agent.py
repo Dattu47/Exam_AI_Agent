@@ -10,7 +10,6 @@ Parallelized URL fetching and accurate HTML-based PDF discovery.
 
 import os
 import re
-import time
 import tempfile
 import urllib3
 from typing import List, Dict, Tuple, Optional

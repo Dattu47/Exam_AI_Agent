@@ -1,7 +1,7 @@
 """
-ExamGenie AI — Academic Exam Research & Resource Hub
-Professional, modern educational website UI inspired by formal Wix academic templates.
-Tabs: 🏛️ Official Authority | 📄 Question Papers (Archive) | 🎥 Video Lectures | 📚 Study Resources & Books
+ExamGenie AI — Academic Examination Research & Resource Portal
+A formal, modern educational examination portal inspired by institutional and Wix education templates.
+Data-first, high-contrast, clean academic layout with zero technical leaks.
 """
 
 import html
@@ -11,635 +11,704 @@ from exam_ai_agent.agents.research_agent import ResearchAgent
 from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
-CURRENT_YEAR = datetime.datetime.now().year
 
 st.set_page_config(
-    page_title="ExamGenie AI — Academic Exam Preparation & Resource Hub",
+    page_title="ExamGenie AI | Exam Research & Preparation",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# ── ACADEMIC / EDUCATIONAL DESIGN SYSTEM (Wix-Inspired) ─────────────────────────
+# ── FORMAL ACADEMIC DESIGN SYSTEM ─────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
 :root {
-  --canvas-bg: #F8FAFC;
-  --surface: #FFFFFF;
-  --surface-alt: #F1F5F9;
+  --bg-canvas: #F8FAFC;
+  --surface-card: #FFFFFF;
+  --surface-subtle: #F1F5F9;
   --surface-hover: #F8FAFC;
-  --primary-navy: #0F1E36;
-  --primary-blue: #1E3A8A;
-  --accent-blue: #2563EB;
-  --accent-blue-hover: #1D4ED8;
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
+  --navy-dark: #0F172A;
+  --navy-primary: #1E293B;
+  --blue-academic: #1D4ED8;
+  --blue-accent: #2563EB;
+  --blue-hover: #1E40AF;
+  --text-main: #0F172A;
+  --text-body: #334155;
+  --text-muted: #475569;
   --border-light: #E2E8F0;
-  --border-strong: #CBD5E1;
-  --verified-bg: #DCFCE7;
-  --verified-text: #15803D;
-  --verified-border: #86EFAC;
-  --pdf-bg: #EFF6FF;
-  --pdf-text: #1D4ED8;
-  --pdf-border: #BFDBFE;
-  --alert-bg: #FEF2F2;
-  --alert-text: #B91C1C;
-  --alert-border: #FECACA;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --border-medium: #CBD5E1;
+  --badge-green-bg: #DCFCE7;
+  --badge-green-text: #166534;
+  --badge-green-border: #BBF7D0;
+  --badge-blue-bg: #EFF6FF;
+  --badge-blue-text: #1E40AF;
+  --badge-blue-border: #BFDBFE;
+  --badge-amber-bg: #FEF3C7;
+  --badge-amber-text: #92400E;
+  --badge-amber-border: #FDE68A;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --radius-sm: 6px;
+  --radius-md: 10px;
 }
 
-/* Base resets & typography */
+/* Page Layout & Container */
 html, body, .stApp {
-  background-color: var(--canvas-bg) !important;
-  color: var(--text-primary) !important;
+  background-color: var(--bg-canvas) !important;
+  color: var(--text-main) !important;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
   -webkit-font-smoothing: antialiased;
 }
 
+p, span, div, li, td, th {
+  color: var(--text-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--navy-dark) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.3px;
+}
+
+strong, b {
+  color: var(--navy-dark) !important;
+  font-weight: 700 !important;
+}
+
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  height: 1.5rem !important;
+}
+
+.main .block-container {
+  padding-top: 1rem !important;
+  padding-bottom: 3rem !important;
+  max-width: 1100px !important;
+}
+
+/* Captions & Subtitles */
+.stCaption, [data-testid="stCaptionContainer"] p {
+  color: var(--text-muted) !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  margin-top: -4px !important;
+  margin-bottom: 14px !important;
+}
+
 /* Header & Navigation Bar */
-.academic-navbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-light);
-  padding: 16px 32px;
-  margin: -6rem -4rem 2rem -4rem;
+.edu-navbar {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 14px 24px;
+  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   box-shadow: var(--shadow-sm);
 }
-.brand-container {
+.edu-brand-left {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.brand-icon {
-  font-size: 1.8rem;
-  background: var(--surface-alt);
-  padding: 8px;
+.edu-brand-icon {
+  font-size: 1.6rem;
+  background: var(--surface-subtle);
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-light);
 }
-.brand-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.4rem;
+.edu-brand-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.25rem;
   font-weight: 800;
-  color: var(--primary-navy);
-  letter-spacing: -0.5px;
+  color: var(--navy-dark);
+  letter-spacing: -0.3px;
   line-height: 1.2;
 }
-.brand-tagline {
+.edu-brand-tag {
   font-size: 0.8rem;
   color: var(--text-muted);
   font-weight: 500;
 }
-.system-status-badge {
-  background: #F0FDF4;
-  color: #166534;
-  border: 1px solid #BBF7D0;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  display: inline-flex;
+.edu-nav-links {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
 }
-.status-dot {
-  width: 8px;
-  height: 8px;
-  background: #22C55E;
-  border-radius: 50%;
-  display: inline-block;
+.edu-nav-item {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-body);
+  text-decoration: none;
+}
+.edu-nav-dot {
+  font-size: 0.75rem;
+  color: var(--border-medium);
+}
+.edu-portal-tag {
+  background: var(--surface-subtle);
+  color: var(--blue-academic);
+  border: 1px solid var(--border-light);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 /* Hero Section */
-.hero-wrapper {
+.edu-hero {
   text-align: center;
-  max-width: 860px;
-  margin: 1.5rem auto 2.5rem auto;
-  padding: 0 16px;
+  max-width: 760px;
+  margin: 0 auto 20px auto;
+  padding: 8px 12px 0 12px;
 }
-.hero-eyebrow {
-  display: inline-block;
-  background: var(--surface-alt);
-  color: var(--accent-blue);
-  border: 1px solid var(--border-light);
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  padding: 6px 16px;
-  border-radius: 30px;
-  margin-bottom: 16px;
-}
-.hero-headline {
-  font-family: 'Outfit', sans-serif;
-  font-size: 3rem;
+.edu-hero-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 2.35rem;
   font-weight: 800;
-  color: var(--primary-navy);
-  letter-spacing: -1px;
-  line-height: 1.15;
-  margin-bottom: 16px;
+  color: var(--navy-dark);
+  letter-spacing: -0.6px;
+  line-height: 1.2;
+  margin-bottom: 12px;
 }
-.hero-subtitle {
-  font-size: 1.15rem;
-  color: var(--text-secondary);
+.edu-hero-desc {
+  font-size: 1.05rem;
+  color: var(--text-body);
   line-height: 1.6;
-  max-width: 720px;
-  margin: 0 auto 2rem auto;
+  margin-bottom: 0;
 }
 
-/* Value Props Grid */
-.trust-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  max-width: 1080px;
-  margin: 0 auto 2.5rem auto;
-  padding: 0 12px;
+/* Streamlit Input & Widget Styling */
+.stTextInput > div > div > input {
+  background: #FFFFFF !important;
+  border: 1.5px solid var(--border-medium) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--navy-dark) !important;
+  padding: 12px 16px !important;
+  font-size: 1.02rem !important;
+  font-weight: 500 !important;
 }
-.trust-card {
-  background: var(--surface);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 20px;
-  text-align: left;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.stTextInput > div > div > input:focus {
+  border-color: var(--blue-academic) !important;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12) !important;
 }
-.trust-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--accent-blue);
-}
-.trust-card-icon {
-  font-size: 1.5rem;
-  margin-bottom: 10px;
-  display: inline-block;
-}
-.trust-card-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--primary-navy);
-  margin-bottom: 6px;
-}
-.trust-card-desc {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  line-height: 1.5;
+.stTextInput > div > div > input::placeholder {
+  color: #64748B !important;
+  opacity: 1 !important;
 }
 
-/* Academic Card Design */
-.edu-card {
-  background: var(--surface);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.edu-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-strong);
-}
-.edu-card-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--primary-navy);
-  margin: 10px 0 8px 0;
-  letter-spacing: -0.3px;
-  line-height: 1.3;
-}
-.edu-card-desc {
-  font-size: 0.92rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin-bottom: 16px;
+/* Checkbox */
+[data-testid="stCheckbox"] label span {
+  color: var(--navy-primary) !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
 }
 
-/* Badges */
-.badge-official {
-  background: var(--verified-bg);
-  color: var(--verified-text);
-  border: 1px solid var(--verified-border);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.badge-pdf {
-  background: var(--pdf-bg);
-  color: var(--pdf-text);
-  border: 1px solid var(--pdf-border);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.badge-tag {
-  background: var(--surface-alt);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-light);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-}
-.badge-alert {
-  background: var(--alert-bg);
-  color: var(--alert-text);
-  border: 1px solid var(--alert-border);
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Academic Info Table */
-.edu-info-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-}
-.edu-info-row {
-  border-bottom: 1px solid var(--border-light);
-  padding: 12px 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.edu-info-row:last-child {
-  border-bottom: none;
-}
-.edu-info-label {
-  font-size: 0.88rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-.edu-info-value {
-  font-size: 0.92rem;
-  color: var(--primary-navy);
-  font-weight: 700;
-  text-align: right;
-}
-
-/* Streamlit Widget Overrides */
-div.stButton > button {
-  background: var(--accent-blue) !important;
+/* Primary Button */
+div.stButton > button, div.stFormSubmitButton > button {
+  background: var(--blue-academic) !important;
   color: #FFFFFF !important;
   font-weight: 700 !important;
   border-radius: var(--radius-sm) !important;
   height: 48px !important;
   border: none !important;
   font-size: 1rem !important;
-  box-shadow: var(--shadow-sm) !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.15s ease !important;
   width: 100% !important;
 }
-div.stButton > button:hover {
-  background: var(--accent-blue-hover) !important;
-  box-shadow: var(--shadow-md) !important;
-  transform: translateY(-1px) !important;
+div.stButton > button:hover, div.stFormSubmitButton > button:hover {
+  background: var(--blue-hover) !important;
+  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25) !important;
 }
 
-.stTextInput > div > div > input {
+/* Secondary Button */
+div.stButton > button[kind="secondary"] {
   background: #FFFFFF !important;
-  border: 1.5px solid var(--border-strong) !important;
-  border-radius: var(--radius-sm) !important;
-  color: var(--text-primary) !important;
-  padding: 12px 18px !important;
-  font-size: 1.05rem !important;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04) !important;
+  color: var(--text-body) !important;
+  border: 1px solid var(--border-medium) !important;
+  height: 38px !important;
+  font-size: 0.88rem !important;
 }
-.stTextInput > div > div > input:focus {
-  border-color: var(--accent-blue) !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+div.stButton > button[kind="secondary"]:hover {
+  background: var(--surface-subtle) !important;
+  color: var(--navy-dark) !important;
+  border-color: var(--text-muted) !important;
 }
 
+/* Link Button */
 .stLinkButton a {
   background: #FFFFFF !important;
-  border: 1px solid var(--border-strong) !important;
+  border: 1.5px solid var(--border-medium) !important;
   border-radius: var(--radius-sm) !important;
-  color: var(--primary-blue) !important;
+  color: var(--blue-academic) !important;
   font-size: 0.88rem !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   padding: 8px 16px !important;
-  box-shadow: var(--shadow-sm) !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.15s ease !important;
   text-align: center !important;
   display: block !important;
 }
 .stLinkButton a:hover {
-  background: var(--surface-alt) !important;
-  border-color: var(--accent-blue) !important;
-  color: var(--accent-blue) !important;
-  transform: translateY(-1px) !important;
+  background: var(--badge-blue-bg) !important;
+  border-color: var(--blue-academic) !important;
+  color: var(--blue-hover) !important;
 }
 
-/* Tabs Styling */
+/* Tabs Header */
 .stTabs [data-baseweb="tab-list"] {
   gap: 8px;
   background-color: transparent;
   border-bottom: 2px solid var(--border-light);
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 .stTabs [data-baseweb="tab"] {
   height: 48px;
   background-color: transparent;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.95rem;
-  padding: 8px 20px;
+  padding: 8px 18px;
+}
+.stTabs [data-baseweb="tab"] p, .stTabs [data-baseweb="tab"] span {
+  color: var(--text-body) !important;
+  font-weight: 600 !important;
+  font-size: 0.94rem !important;
 }
 .stTabs [aria-selected="true"] {
-  background-color: var(--surface) !important;
-  color: var(--accent-blue) !important;
-  border-bottom: 3px solid var(--accent-blue) !important;
+  background-color: var(--surface-card) !important;
+  border-bottom: 3px solid var(--blue-academic) !important;
+}
+.stTabs [aria-selected="true"] p, .stTabs [aria-selected="true"] span {
+  color: var(--blue-academic) !important;
   font-weight: 700 !important;
 }
 
-/* Dashboard Banner */
-.dash-banner {
-  background: var(--surface);
+/* Status & Alert Widgets */
+[data-testid="stStatusWidget"] {
+  background: #FFFFFF !important;
+  border: 1.5px solid var(--border-medium) !important;
+  border-radius: var(--radius-md) !important;
+}
+[data-testid="stStatusWidget"] * {
+  color: var(--navy-dark) !important;
+}
+
+/* Academic Card Design */
+.edu-card {
+  background: var(--surface-card);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  padding: 20px 24px;
-  margin-bottom: 24px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.edu-card:hover {
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-hover);
+}
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.card-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin: 4px 0 6px 0;
+  line-height: 1.4;
+}
+.card-desc {
+  font-size: 0.90rem;
+  color: var(--text-body);
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+/* Badges */
+.badge-official {
+  background: var(--badge-green-bg);
+  color: var(--badge-green-text);
+  border: 1px solid var(--badge-green-border);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-pdf {
+  background: var(--badge-blue-bg);
+  color: var(--badge-blue-text);
+  border: 1px solid var(--badge-blue-border);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-tag {
+  background: var(--surface-subtle);
+  color: var(--navy-primary);
+  border: 1px solid var(--border-light);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+.badge-category {
+  background: var(--badge-amber-bg);
+  color: var(--badge-amber-text);
+  border: 1px solid var(--badge-amber-border);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Key Fact Sheet */
+.fact-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.fact-row {
+  border-bottom: 1px solid var(--border-light);
+  padding: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fact-row:last-child {
+  border-bottom: none;
+}
+.fact-label {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.fact-val {
+  font-size: 0.92rem;
+  color: var(--navy-dark);
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Results Top Banner */
+.results-header-banner {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   box-shadow: var(--shadow-sm);
 }
-.dash-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.6rem;
+.results-exam-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.5rem;
   font-weight: 800;
-  color: var(--primary-navy);
-  margin-bottom: 4px;
+  color: var(--navy-dark);
 }
-.dash-meta {
-  font-size: 0.85rem;
+.results-timestamp {
+  font-size: 0.82rem;
   color: var(--text-muted);
+  margin-top: 2px;
+  font-weight: 500;
 }
-.meta-pills {
+.results-pills {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-/* Footer */
-.academic-footer {
-  border-top: 1px solid var(--border-light);
-  margin-top: 4rem;
-  padding: 28px 0 20px 0;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+/* Feature Showcase Grid (When no active search) */
+.showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
 }
-.footer-brand {
-  font-family: 'Outfit', sans-serif;
+.showcase-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.showcase-icon {
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+.showcase-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--primary-navy);
-  font-size: 1rem;
+  color: var(--navy-dark);
   margin-bottom: 6px;
 }
+.showcase-desc {
+  font-size: 0.88rem;
+  color: var(--text-body);
+  line-height: 1.5;
+}
 
-/* Mobile Responsiveness */
+/* Minimal Academic Footer */
+.edu-footer {
+  border-top: 1px solid var(--border-light);
+  margin-top: 48px;
+  padding: 24px 0 12px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
 @media (max-width: 768px) {
-  .hero-headline { font-size: 2.1rem; }
-  .academic-navbar { margin: -5rem -1rem 1.5rem -1rem; padding: 12px 16px; }
-  .trust-grid { grid-template-columns: 1fr; }
-  .dash-banner { flex-direction: column; align-items: flex-start; }
+  .edu-hero-title { font-size: 1.85rem; }
+  .edu-navbar { padding: 12px 16px; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .results-header-banner { flex-direction: column; align-items: flex-start; }
+  .showcase-grid { grid-template-columns: 1fr; }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ── TOP NAVIGATION BAR ────────────────────────────────────────────────────────
+# ── COMPACT HEADER & NAVBAR ───────────────────────────────────────────────────
 st.markdown("""
-<div class="academic-navbar">
-  <div class="brand-container">
-    <div class="brand-icon">🎓</div>
+<div class="edu-navbar">
+  <div class="edu-brand-left">
+    <div class="edu-brand-icon">🎓</div>
     <div>
-      <div class="brand-title">EXAMGENIE AI</div>
-      <div class="brand-tagline">Academic Examination Research & Authority Hub</div>
+      <div class="edu-brand-name">EXAMGENIE AI</div>
+      <div class="edu-brand-tag">Exam Research & Preparation</div>
     </div>
-  </div>
-  <div class="system-status-badge">
-    <span class="status-dot"></span> Multi-Agent Research Engine Active
   </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ── SESSION STATE INITIALIZATION ──────────────────────────────────────────────
-for k, v in [("agent", None), ("results", None), ("last_exam", ""), ("updated_at", ""), ("force_refresh", False)]:
-    if k not in st.session_state:
-        st.session_state[k] = v
+for state_key, default_val in [
+    ("agent", None),
+    ("results", None),
+    ("last_exam", ""),
+    ("updated_at", ""),
+    ("trigger_search", False),
+]:
+    if state_key not in st.session_state:
+        st.session_state[state_key] = default_val
 
 if st.session_state.agent is None:
     st.session_state.agent = ResearchAgent()
 
 
-def run_pipeline(exam_name: str, force_refresh: bool = False):
-    """Executes the research aggregation pipeline with dynamic academic progress timeline."""
-    with st.status(f"Conducting academic research for {exam_name}...", expanded=True) as status:
+def perform_research(exam_name: str, force_refresh: bool = False):
+    """Executes the research aggregation pipeline with clean educational milestones."""
+    with st.status(f"Researching: {exam_name}", expanded=True) as status:
         try:
-            status.update(label="1/6 🌐 Scanning Tier-1 authority portals (.gov.in / .nic.in / .ac.in)...")
-            status.update(label="2/6 ⚖️ Verifying examination body facts & syllabus documents...")
-            status.update(label="3/6 📑 Discovering authentic previous year question papers...")
-            status.update(label="4/6 🎬 Curating verified educational video playlists (excluding Shorts)...")
-            status.update(label="5/6 📖 Evaluating recognized textbooks & educational platforms...")
-            
-            final_res = st.session_state.agent.research_exam(exam_name, force_refresh=force_refresh)
-            
-            status.update(label="6/6 ✅ Finalizing verified examination dashboard...", state="complete", expanded=False)
+            status.update(label="✓ Finding official authority information...")
+            status.update(label="✓ Collecting previous papers & answer keys...")
+            status.update(label="✓ Finding study resources & textbooks...")
+            status.update(label="✓ Curating video lecture courses...")
+
+            result = st.session_state.agent.research_exam(exam_name, force_refresh=force_refresh)
+
+            status.update(label="Research verified and complete.", state="complete", expanded=False)
             st.session_state.updated_at = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
-            return final_res
+            return result
         except Exception as e:
-            logger.error("Pipeline failure for '%s': %s", exam_name, e)
-            status.update(label="Research aggregation encountered an issue.", state="error", expanded=True)
-            st.error("Something went wrong while researching this examination. Please check your network connection or try live refresh.")
+            logger.error("Research error for '%s': %s", exam_name, e)
+            status.update(label="Research encountered an issue. Please try live refresh.", state="error", expanded=True)
+            st.error("Unable to complete research. Please check your connection or try Force Live Refresh.")
             return None
 
 
-# ── HERO & SEARCH SECTION ─────────────────────────────────────────────────────
+# ── HERO SECTION ──────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="hero-wrapper">
-  <div class="hero-eyebrow">Academic Research Platform</div>
-  <h1 class="hero-headline">Research Less. Prepare Smarter.</h1>
-  <p class="hero-subtitle">
-    Autonomous discovery of verified official authority portals, authenticated syllabi, 
-    genuine previous year question papers, and curated lecture series for competitive exams.
+<div class="edu-hero">
+  <h1 class="edu-hero-title">Research Smarter. Prepare Better.</h1>
+  <p class="edu-hero-desc">
+    Find trusted exam information, previous papers, study resources and learning materials — all in one place.
   </p>
 </div>
 """, unsafe_allow_html=True)
 
-# Search input row
-search_col, btn_col = st.columns([4, 1.2])
-with search_col:
-    exam_query = st.text_input(
-        "search_input",
-        value=st.session_state.last_exam,
-        placeholder="Enter target exam (e.g. GATE CSE, UPSC Prelims, JEE Advanced, SSC CGL)...",
-        label_visibility="collapsed",
-    )
-with btn_col:
-    search_clicked = st.button("Search Examination 🔍", use_container_width=True)
+# ── SEARCH CONTAINER ──────────────────────────────────────────────────────────
+with st.container():
+    with st.form(key="exam_search_form", border=False):
+        search_col, btn_col = st.columns([4, 1.3])
+        with search_col:
+            exam_input = st.text_input(
+                "search_query",
+                value=st.session_state.last_exam,
+                placeholder="Enter an exam or competitive test",
+                label_visibility="collapsed",
+            )
+        with btn_col:
+            search_submitted = st.form_submit_button("Start Research →", use_container_width=True)
 
-# Options bar below search
-opt_col1, opt_col2 = st.columns([1, 1])
-with opt_col1:
-    force_refresh_toggle = st.checkbox(
-        "⚡ Bypass Cache / Force Live Refresh",
-        value=False,
-        help="Re-runs full web search and verification, bypassing saved database snapshots.",
-    )
-with opt_col2:
-    if st.session_state.results:
-        if st.button("🔄 Clear Search Results", use_container_width=False):
-            st.session_state.results = None
-            st.session_state.last_exam = ""
-            st.session_state.updated_at = ""
-            st.rerun()
+    # Sub-controls row
+    opt_col1, opt_col2 = st.columns([1.2, 1])
+    with opt_col1:
+        force_refresh_checked = st.checkbox(
+            "Force Live Refresh",
+            value=False,
+            help="Bypass cached snapshots and re-run live web searches across all sources.",
+        )
+    with opt_col2:
+        if st.session_state.results:
+            if st.button("Clear Results", use_container_width=False):
+                st.session_state.results = None
+                st.session_state.last_exam = ""
+                st.session_state.updated_at = ""
+                st.rerun()
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ── TRUST & VALUE SECTION (Displayed when no active results) ───────────────────
-if not st.session_state.results and not (search_clicked and exam_query.strip()):
+# ── HOMEPAGE OVERVIEW (When no active search results) ─────────────────────────
+if not st.session_state.results and not (search_submitted and exam_input.strip()):
     st.markdown("""
-<div class="trust-grid">
-  <div class="trust-card">
-    <div class="trust-card-icon">🏛️</div>
-    <div class="trust-card-title">Verified Official Portals</div>
-    <div class="trust-card-desc">Direct links to conducting bodies (.gov.in, .nic.in) bypassing blog spam.</div>
+<div class="showcase-grid">
+  <div class="showcase-card">
+    <div class="showcase-icon">🏛️</div>
+    <div class="showcase-title">Official Authority Information</div>
+    <div class="showcase-desc">Direct links to verified conducting bodies, authenticated syllabus bulletins, notification schedules, and official guidelines.</div>
   </div>
-  <div class="trust-card">
-    <div class="trust-card-icon">📄</div>
-    <div class="trust-card-title">Authentic Past Papers</div>
-    <div class="trust-card-desc">Downloadable PYQ PDFs and verified answer keys with year metadata.</div>
+  <div class="showcase-card">
+    <div class="showcase-icon">📄</div>
+    <div class="showcase-title">Previous Question Papers</div>
+    <div class="showcase-desc">Past year question papers, official answer keys, and authentic examination archives organized with year metadata.</div>
   </div>
-  <div class="trust-card">
-    <div class="trust-card-icon">🎥</div>
-    <div class="trust-card-title">Curated Video Courses</div>
-    <div class="trust-card-desc">Structured lecture series categorized by Foundation, Full Course, and PYQs.</div>
-  </div>
-  <div class="trust-card">
-    <div class="trust-card-icon">📚</div>
-    <div class="trust-card-title">Standard Reference Books</div>
-    <div class="trust-card-desc">Recommended textbooks from recognized institutions and toppers' references.</div>
+  <div class="showcase-card">
+    <div class="showcase-icon">📚</div>
+    <div class="showcase-title">Resources, Books & Video Lectures</div>
+    <div class="showcase-desc">Curated preparation guides from recognized academic platforms, standard reference textbooks, and structured video courses.</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── SEARCH EXECUTION ──────────────────────────────────────────────────────────
-if search_clicked and exam_query.strip():
-    with st.spinner("Initializing multi-agent research..."):
-        res = run_pipeline(exam_query.strip(), force_refresh=force_refresh_toggle)
-        if res:
-            st.session_state.results = res
-            st.session_state.last_exam = exam_query.strip()
+# ── HANDLE SEARCH EXECUTION ───────────────────────────────────────────────────
+should_run = (search_submitted and exam_input.strip()) or st.session_state.trigger_search
+target_to_run = exam_input.strip() if search_submitted else st.session_state.last_exam
+
+if should_run and target_to_run:
+    st.session_state.trigger_search = False
+    with st.spinner("Conducting comprehensive exam research..."):
+        fresh_data = perform_research(target_to_run, force_refresh=force_refresh_checked)
+        if fresh_data:
+            st.session_state.results = fresh_data
+            st.session_state.last_exam = target_to_run
             st.rerun()
 
-# Halt execution if no results present
+# If still no results present, show clean footer and stop
 if not st.session_state.results:
+    st.markdown("""
+<div class="edu-footer">
+  <strong>ExamGenie AI</strong> • Comprehensive Academic Examination Research & Preparation
+</div>
+""", unsafe_allow_html=True)
     st.stop()
 
-# ── DASHBOARD RESULTS PRESENTATION ─────────────────────────────────────────────
+# ── RESULTS DASHBOARD PRESENTATION ─────────────────────────────────────────────
 data = st.session_state.results or {}
-authority = data.get("authority", {})
-archive = data.get("archive", [])
-videos = data.get("videos", [])
-library = data.get("library", {})
-meta = data.get("_metadata", {})
+authority = data.get("authority") if isinstance(data.get("authority"), dict) else {}
+archive = data.get("archive") if isinstance(data.get("archive"), list) else []
+videos = data.get("videos") if isinstance(data.get("videos"), list) else []
+library = data.get("library") if isinstance(data.get("library"), dict) else {}
+edtech_links = library.get("edtech_links") if isinstance(library.get("edtech_links"), list) else []
+books = library.get("books") if isinstance(library.get("books"), list) else []
+meta = data.get("_metadata") if isinstance(data.get("_metadata"), dict) else {}
 
-active_exam = st.session_state.last_exam or "Target Examination"
-is_cache_hit = meta.get("cache_hit", False)
-source_status = "Cached Snapshot (Instant)" if is_cache_hit else "Live Verified Scan"
-updated_display = st.session_state.updated_at or "Recently Verified"
+active_exam = st.session_state.last_exam or meta.get("exam_name", "Examination")
+is_cache = meta.get("cache_hit", False)
+source_label = "Instant Cached Snapshot" if is_cache else "Live Verified Research"
+last_updated = st.session_state.updated_at or "Recently Verified"
+
+total_resources_and_books = len(edtech_links) + len(books)
 
 # Results Overview Banner
 st.markdown(f"""
-<div class="dash-banner">
+<div class="results-header-banner">
   <div>
-    <div class="dash-title">🎓 {html.escape(active_exam.upper())}</div>
-    <div class="dash-meta">Verified Research Dashboard • Last Checked: {updated_display}</div>
+    <div class="results-exam-title">{html.escape(active_exam.upper())}</div>
+    <div class="results-timestamp">Last Updated: {last_updated} • Status: {source_label}</div>
   </div>
-  <div class="meta-pills">
-    <span class="badge-tag">📊 Status: {source_status}</span>
-    <span class="badge-tag">📑 {len(archive)} Past Papers</span>
-    <span class="badge-tag">🎬 {len(videos)} Video Courses</span>
+  <div class="results-pills">
+    <span class="badge-tag">🏛️ Authority Verified</span>
+    <span class="badge-tag">📄 {len(archive)} Papers</span>
+    <span class="badge-tag">📚 {total_resources_and_books} Resources & Books</span>
+    <span class="badge-tag">🎥 {len(videos)} Video Series</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── 4 ACADEMIC TABS ───────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🏛️ Official Exam Information",
-    "📄 Previous Year Question Papers",
-    "🎥 Curated Video Lectures",
-    "📚 Study Resources & Recommended Books",
+# ── 4 CONSOLIDATED ACADEMIC DATA TABS ───────────────────────────────────────────
+tab_auth, tab_pyq, tab_resources, tab_video = st.tabs([
+    "🏛️ Authority",
+    "📄 Previous Papers",
+    "📚 Resources & Books",
+    "🎥 Video Lectures",
 ])
 
-# ── TAB 1: OFFICIAL EXAM INFORMATION (AUTHORITY) ──────────────────────────────
-with tab1:
-    details = authority.get("details", {})
-    off_site = authority.get("official_site")
-    syl_pdf = authority.get("syllabus_pdf")
+# ── TAB 1: AUTHORITY ──────────────────────────────────────────────────────────
+with tab_auth:
+    details = authority.get("details") if isinstance(authority.get("details"), dict) else {}
+    off_site = authority.get("official_site") if isinstance(authority.get("official_site"), dict) else None
+    syl_pdf = authority.get("syllabus_pdf") if isinstance(authority.get("syllabus_pdf"), dict) else None
     has_update = details.get("has_new_update", False)
 
-    col_left, col_right = st.columns([1.2, 1])
+    col1, col2 = st.columns([1.2, 1])
 
-    with col_left:
+    with col1:
         # Official Website Card
         if off_site and off_site.get("url"):
-            site_title = html.escape(off_site.get("title", f"{active_exam} Official Portal"))
+            site_title = html.escape(str(off_site.get("title") or f"{active_exam} Official Portal"))
             site_url = off_site.get("url", "#")
             is_gov = off_site.get("is_gov_domain", False)
-            gov_badge = '<span class="badge-official">✓ Verified Official Source</span>' if is_gov else '<span class="badge-tag">Primary Portal</span>'
+            badge_html = '<span class="badge-official">✓ Official Source</span>' if is_gov else '<span class="badge-tag">Primary Portal</span>'
 
             st.markdown(f"""
 <div class="edu-card">
-  {gov_badge}
-  <div class="edu-card-title">{site_title}</div>
-  <div class="edu-card-desc">
-    This is the primary authority portal for application procedures, notifications, and examination rules. 
-    Always rely on this domain over third-party commercial portals.
+  {badge_html}
+  <div class="card-title">{site_title}</div>
+  <div class="card-desc">
+    Official authority portal for applications, notifications, schedules, and examination regulations.
   </div>
 </div>
 """, unsafe_allow_html=True)
             st.link_button("Launch Official Website ↗", site_url, use_container_width=True)
         else:
-            st.markdown(f"""
+            st.markdown("""
 <div class="edu-card">
-  <span class="badge-tag">Web Search</span>
-  <div class="edu-card-title">Conducting Body Portal</div>
-  <div class="edu-card-desc">Direct government authority domain requires manual verification.</div>
+  <span class="badge-tag">Web Portal</span>
+  <div class="card-title">Conducting Body Portal</div>
+  <div class="card-desc">Direct government authority domain requires manual verification.</div>
 </div>
 """, unsafe_allow_html=True)
             fallback_search = f"https://www.google.com/search?q={active_exam.replace(' ', '+')}+official+website"
@@ -647,54 +716,54 @@ with tab1:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Official Syllabus Document Card
+        # Official Syllabus Card
         if syl_pdf and syl_pdf.get("url"):
-            syl_title = html.escape(syl_pdf.get("title", f"{active_exam} Information Bulletin / Syllabus PDF"))
+            syl_title = html.escape(str(syl_pdf.get("title") or f"{active_exam} Official Syllabus / Bulletin"))
             syl_url = syl_pdf.get("url", "#")
+            is_pdf = syl_pdf.get("is_pdf", False) or syl_url.lower().endswith(".pdf")
+            doc_badge = '<span class="badge-pdf">📄 Syllabus PDF</span>' if is_pdf else '<span class="badge-tag">🔗 Syllabus Portal</span>'
 
             st.markdown(f"""
 <div class="edu-card">
-  <span class="badge-pdf">📄 Deep Link Document</span>
-  <div class="edu-card-title">{syl_title}</div>
-  <div class="edu-card-desc">
-    Official syllabus and curriculum bulletin hosted on institutional servers. 
-    Bypasses third-party advertising and clickbait summaries.
+  {doc_badge}
+  <div class="card-title">{syl_title}</div>
+  <div class="card-desc">
+    Official curriculum document and examination scheme published by the conducting institution.
   </div>
 </div>
 """, unsafe_allow_html=True)
-            st.link_button("Download Official Syllabus PDF 📥", syl_url, use_container_width=True)
+            st.link_button("Download Official Syllabus 📥", syl_url, use_container_width=True)
         else:
-            st.info("ℹ️ Direct syllabus PDF deep link not indexed. Refer to the official website portal above.")
+            st.info("Direct syllabus document not indexed. Refer to the official website link above.")
 
-    with col_right:
-        # Status Ticker Card
-        if has_update:
-            st.markdown('<div class="badge-alert">🚨 Recent Notification / Update Live</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="badge-tag" style="width:100%;text-align:center;box-sizing:border-box;">ℹ️ Regular Examination Schedule</div>', unsafe_allow_html=True)
+    with col2:
+        conducting_body = html.escape(str(details.get("conducting_body") or "Official Examination Authority"))
+        frequency = html.escape(str(details.get("frequency") or "Annual"))
+        reg_dates = html.escape(str(details.get("registration_dates") or "Refer to official notifications"))
+        about_exam = html.escape(str(details.get("about_exam") or ""))
 
-        conducting_body = html.escape(str(details.get("conducting_body", "Official Examination Authority")))
-        frequency = html.escape(str(details.get("frequency", "Annual")))
-        reg_dates = html.escape(str(details.get("registration_dates", "Refer to official bulletin")))
-        about_exam = html.escape(str(details.get("about_exam", "")))
+        status_tag = '<span class="badge-official">✓ Active Schedule</span>' if has_update else '<span class="badge-tag">Regular Annual Cycle</span>'
 
         st.markdown(f"""
 <div class="edu-card">
-  <div style="font-family:'Outfit',sans-serif;font-weight:700;color:var(--primary-navy);font-size:1.1rem;margin-bottom:12px;border-bottom:1px solid var(--border-light);padding-bottom:8px;">
-    Official Key Facts
+  <div class="card-header-row">
+    <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:var(--navy-dark);font-size:1.05rem;">
+      Key Facts
+    </span>
+    {status_tag}
   </div>
-  <div class="edu-info-table">
-    <div class="edu-info-row">
-      <span class="edu-info-label">Conducting Authority</span>
-      <span class="edu-info-value">{conducting_body}</span>
+  <div class="fact-table">
+    <div class="fact-row">
+      <span class="fact-label">Conducting Authority</span>
+      <span class="fact-val">{conducting_body}</span>
     </div>
-    <div class="edu-info-row">
-      <span class="edu-info-label">Exam Frequency</span>
-      <span class="edu-info-value">{frequency}</span>
+    <div class="fact-row">
+      <span class="fact-label">Exam Frequency</span>
+      <span class="fact-val">{frequency}</span>
     </div>
-    <div class="edu-info-row">
-      <span class="edu-info-label">Application Window</span>
-      <span class="edu-info-value" style="color:var(--accent-blue);">{reg_dates}</span>
+    <div class="fact-row">
+      <span class="fact-label">Application Timeline</span>
+      <span class="fact-val" style="color:var(--blue-academic);">{reg_dates}</span>
     </div>
   </div>
 </div>
@@ -703,136 +772,239 @@ with tab1:
         if about_exam and about_exam != "Not Available":
             st.markdown(f"""
 <div class="edu-card">
-  <div style="font-family:'Outfit',sans-serif;font-weight:700;color:var(--primary-navy);font-size:1.05rem;margin-bottom:8px;">
-    Overview & Objective
+  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:var(--navy-dark);font-size:1rem;margin-bottom:8px;">
+    Examination Overview
   </div>
-  <div class="edu-card-desc" style="margin-bottom:0;">{about_exam}</div>
+  <div class="card-desc" style="margin-bottom:0;">{about_exam}</div>
 </div>
 """, unsafe_allow_html=True)
 
 
-# ── TAB 2: PREVIOUS YEAR QUESTION PAPERS (ARCHIVE) ────────────────────────────
-with tab2:
-    st.markdown("### 📄 Previous Year Question Papers & Official Solutions")
-    st.caption("Authenticated question papers, solved mock tests, and answer keys prioritized by source reliability.")
+# ── TAB 2: PREVIOUS PAPERS ────────────────────────────────────────────────────
+with tab_pyq:
+    st.markdown("### Previous Year Question Papers")
+    st.caption("Authenticated question papers, solved past examinations, and answer keys.")
 
     if archive:
-        for p in archive:
-            title = html.escape(str(p.get("title", "Previous Year Question Paper")))
-            url = p.get("url", "#")
-            is_pdf = (p.get("type") == "pdf") or url.lower().endswith(".pdf") or "pdf" in url.lower()
-            year = html.escape(str(p.get("year", "Recent")))
-            is_off = p.get("is_official", False)
-            source_lbl = html.escape(str(p.get("source", "Verified Source")))
-            
-            badge_html = '<span class="badge-official">✓ Official Domain</span> ' if is_off else ''
-            badge_html += '<span class="badge-pdf">📄 PDF Document</span>' if is_pdf else '<span class="badge-tag">🔗 Web Portal</span>'
+        # Prioritize direct PDF links first
+        sorted_papers = sorted(
+            archive,
+            key=lambda x: (
+                0 if ((x.get("type") == "pdf") or str(x.get("url", "")).lower().endswith(".pdf")) else 1,
+                0 if x.get("is_official", False) else 1,
+            )
+        )
 
-            st.markdown(f"""
-<div class="edu-card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        seen_urls = set()
+        for p in sorted_papers:
+            url = p.get("url", "#")
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+
+            title = html.escape(str(p.get("title") or "Question Paper"))
+            is_pdf = (p.get("type") == "pdf") or url.lower().endswith(".pdf") or "pdf" in url.lower()
+            year = html.escape(str(p.get("year") or "Recent"))
+            is_off = p.get("is_official", False)
+            source_lbl = html.escape(str(p.get("source") or "Verified Source"))
+
+            badge_html = '<span class="badge-official">✓ Official Domain</span> ' if is_off else ''
+            badge_html += '<span class="badge-pdf">📄 PDF</span>' if is_pdf else '<span class="badge-tag">🔗 Web Link</span>'
+
+            card_col, btn_col = st.columns([4, 1.2])
+            with card_col:
+                st.markdown(f"""
+<div class="edu-card" style="margin-bottom:10px;padding:14px 18px;">
+  <div class="card-header-row" style="margin-bottom:4px;">
     <div>{badge_html}</div>
     <span class="badge-tag">Year: {year} • {source_lbl}</span>
   </div>
-  <div class="edu-card-title" style="font-size:1.1rem;margin-top:4px;">{title}</div>
+  <div class="card-title" style="font-size:1.02rem;margin:4px 0 0 0;">{title}</div>
 </div>
 """, unsafe_allow_html=True)
-            st.link_button(f"Access Paper ({'PDF' if is_pdf else 'Link'}) ↗", url, key=f"pyq_{url}")
+            with btn_col:
+                st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+                btn_label = "Open PDF 📥" if is_pdf else "Open Resource ↗"
+                st.link_button(btn_label, url, use_container_width=True)
     else:
-        st.info("ℹ️ No previous papers were identified for this exam. You can check the official portal in Tab 1 for published question banks.")
+        st.info("No previous papers directly indexed for this query. Refer to the official website in the Authority tab.")
 
 
-# ── TAB 3: CURATED VIDEO LECTURES ─────────────────────────────────────────────
-with tab3:
-    st.markdown("### 🎥 Curated Video Courses & Topic Playlists")
-    st.caption("Structured video playlists from recognized educators categorized by difficulty level.")
+# ── TAB 3: COMBINED RESOURCES & BOOKS ──────────────────────────────────────────
+with tab_resources:
+    st.markdown("### Resources & Books")
+    st.caption("Preparation resources, recognized learning platforms, standard textbooks, and study materials.")
+
+    has_any_content = bool(edtech_links or books)
+
+    if not has_any_content:
+        st.info("No specialized study materials or books indexed for this examination query.")
+    else:
+        # Partition edtech_links into subcategories:
+        # 1) PDFs & Study Materials
+        # 2) Learning Platforms
+        # 3) Preparation Resources
+        pdf_materials = []
+        platform_resources = []
+        prep_resources = []
+
+        for item in edtech_links:
+            url_lower = str(item.get("url", "")).lower()
+            cat = str(item.get("category", "")).lower()
+            is_doc = url_lower.endswith(".pdf") or "pdf" in url_lower or "notes" in cat or "pdf" in cat
+
+            if is_doc:
+                pdf_materials.append(item)
+            elif any(k in cat for k in ["platform", "course", "portal", "institute"]) or any(k in str(item.get("platform", "")).lower() for k in ["academy", "portal", "course"]):
+                platform_resources.append(item)
+            else:
+                prep_resources.append(item)
+
+        # Fallback if partitioning leaves prep_resources empty but items exist
+        if not prep_resources and not platform_resources and not pdf_materials and edtech_links:
+            prep_resources = edtech_links
+
+        # ── SUBCATEGORY 1: PREPARATION RESOURCES ──────────────────────────────
+        if prep_resources:
+            st.markdown("#### Preparation Resources")
+            for d in prep_resources:
+                title = html.escape(str(d.get("title") or "Study Resource"))
+                platform = html.escape(str(d.get("platform") or "Educational Source"))
+                desc = html.escape(str(d.get("description") or "Comprehensive syllabus preparation material."))
+                url = d.get("url", "#")
+                cat_tag = html.escape(str(d.get("category") or "Preparation Guide"))
+
+                r_col1, r_col2 = st.columns([4, 1.2])
+                with r_col1:
+                    st.markdown(f"""
+<div class="edu-card" style="margin-bottom:10px;padding:14px 18px;">
+  <div class="card-header-row" style="margin-bottom:4px;">
+    <span class="badge-category">{cat_tag}</span>
+    <span class="badge-tag">Source: {platform}</span>
+  </div>
+  <div class="card-title" style="font-size:1.02rem;margin:4px 0 6px 0;">{title}</div>
+  <div class="card-desc" style="margin-bottom:0;">{desc}</div>
+</div>
+""", unsafe_allow_html=True)
+                with r_col2:
+                    st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+                    st.link_button("Open Resource ↗", url, use_container_width=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── SUBCATEGORY 2: LEARNING PLATFORMS ─────────────────────────────────
+        if platform_resources:
+            st.markdown("#### Learning Platforms")
+            for d in platform_resources:
+                title = html.escape(str(d.get("title") or "Learning Platform Resource"))
+                platform = html.escape(str(d.get("platform") or "Educational Portal"))
+                desc = html.escape(str(d.get("description") or "Educational course modules and subject material."))
+                url = d.get("url", "#")
+
+                r_col1, r_col2 = st.columns([4, 1.2])
+                with r_col1:
+                    st.markdown(f"""
+<div class="edu-card" style="margin-bottom:10px;padding:14px 18px;">
+  <div class="card-header-row" style="margin-bottom:4px;">
+    <span class="badge-tag">Platform: {platform}</span>
+  </div>
+  <div class="card-title" style="font-size:1.02rem;margin:4px 0 6px 0;">{title}</div>
+  <div class="card-desc" style="margin-bottom:0;">{desc}</div>
+</div>
+""", unsafe_allow_html=True)
+                with r_col2:
+                    st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+                    st.link_button("Open Resource ↗", url, use_container_width=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── SUBCATEGORY 3: BOOKS ──────────────────────────────────────────────
+        if books:
+            st.markdown("#### Books")
+            b_cols = st.columns(2)
+            for idx, b in enumerate(books):
+                b_title = html.escape(str(b.get("title") or "Standard Reference Textbook"))
+                author = html.escape(str(b.get("author") or "Recognized Academic Author"))
+                purpose = html.escape(str(b.get("purpose") or "Core Theory & Practice"))
+                url = b.get("url", "#")
+
+                with b_cols[idx % 2]:
+                    st.markdown(f"""
+<div class="edu-card" style="height:calc(100% - 16px);margin-bottom:12px;">
+  <div class="card-header-row" style="margin-bottom:6px;">
+    <span class="badge-tag">📖 Reference Book</span>
+    <span style="font-size:0.78rem;color:var(--blue-academic);font-weight:700;">{purpose}</span>
+  </div>
+  <div class="card-title" style="font-size:1.05rem;">{b_title}</div>
+  <div class="card-desc">Author / Publication: <strong>{author}</strong></div>
+</div>
+""", unsafe_allow_html=True)
+                    if url and url != "#":
+                        st.link_button("View Resource ↗", url, use_container_width=True)
+                    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── SUBCATEGORY 4: PDFS & STUDY MATERIALS ─────────────────────────────
+        if pdf_materials:
+            st.markdown("#### PDFs & Study Materials")
+            for d in pdf_materials:
+                title = html.escape(str(d.get("title") or "Study Notes Document"))
+                platform = html.escape(str(d.get("platform") or "Educational Source"))
+                desc = html.escape(str(d.get("description") or "Downloadable curriculum notes and reference document."))
+                url = d.get("url", "#")
+
+                r_col1, r_col2 = st.columns([4, 1.2])
+                with r_col1:
+                    st.markdown(f"""
+<div class="edu-card" style="margin-bottom:10px;padding:14px 18px;">
+  <div class="card-header-row" style="margin-bottom:4px;">
+    <span class="badge-pdf">📄 PDF Document</span>
+    <span class="badge-tag">Source: {platform}</span>
+  </div>
+  <div class="card-title" style="font-size:1.02rem;margin:4px 0 6px 0;">{title}</div>
+  <div class="card-desc" style="margin-bottom:0;">{desc}</div>
+</div>
+""", unsafe_allow_html=True)
+                with r_col2:
+                    st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+                    st.link_button("Open PDF 📥", url, use_container_width=True)
+
+
+# ── TAB 4: VIDEO LECTURES ─────────────────────────────────────────────────────
+with tab_video:
+    st.markdown("### Video Lectures")
+    st.caption("Complete courses, topic playlists, and problem-solving sessions from verified educators.")
 
     if videos:
         v_cols = st.columns(2)
         for idx, v in enumerate(videos):
-            title = html.escape(str(v.get("title", "Exam Lecture Series")))
-            cat = html.escape(str(v.get("category", "Full Course")))
-            channel = html.escape(str(v.get("channel", "Verified Educator")))
-            desc = html.escape(str(v.get("description", "Comprehensive syllabus preparation course.")))
+            title = html.escape(str(v.get("title") or "Exam Lecture Series"))
+            cat = html.escape(str(v.get("category") or "Full Course"))
+            channel = html.escape(str(v.get("channel") or "Verified Educator"))
+            desc = html.escape(str(v.get("description") or "Structured course lectures."))
             url = v.get("url", "#")
 
             with v_cols[idx % 2]:
                 st.markdown(f"""
-<div class="edu-card" style="height:calc(100% - 20px);">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+<div class="edu-card" style="height:calc(100% - 16px);margin-bottom:12px;">
+  <div class="card-header-row" style="margin-bottom:6px;">
     <span class="badge-tag">▶️ {cat.upper()}</span>
-    <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">{channel}</span>
+    <span style="font-size:0.82rem;color:var(--text-muted);font-weight:600;">{channel}</span>
   </div>
-  <div class="edu-card-title" style="font-size:1.15rem;">{title}</div>
-  <div class="edu-card-desc">{desc}</div>
+  <div class="card-title" style="font-size:1.05rem;">{title}</div>
+  <div class="card-desc">{desc}</div>
 </div>
 """, unsafe_allow_html=True)
-                st.link_button("Watch Course Playlist ▶️", url, key=f"yt_{url}_{idx}")
+                st.link_button("Watch Playlist ▶️", url, use_container_width=True)
+                st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
     else:
-        st.info("ℹ️ No verified video courses found for this query.")
+        st.info("No curated video courses found for this query.")
 
 
-# ── TAB 4: STUDY RESOURCES & RECOMMENDED BOOKS ────────────────────────────────
-with tab4:
-    st.markdown("### 📚 Study Resources & Recommended Reference Books")
-    st.caption("Curated preparatory material from recognized educational institutions and topper recommendations.")
-
-    edtech_links = library.get("edtech_links", [])
-    books = library.get("books", [])
-
-    st.markdown("#### 🏛️ Recognized Academic & Learning Platforms")
-    if edtech_links:
-        for d in edtech_links:
-            title = html.escape(str(d.get("title", "Educational Resource")))
-            platform = html.escape(str(d.get("platform", "Educational Platform")))
-            desc = html.escape(str(d.get("description", "Exam preparation modules and practice material.")))
-            url = d.get("url", "#")
-
-            st.markdown(f"""
-<div class="edu-card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span class="badge-official">✓ {platform}</span>
-  </div>
-  <div class="edu-card-title" style="font-size:1.1rem;">{title}</div>
-  <div class="edu-card-desc" style="margin-bottom:12px;">{desc}</div>
-</div>
-""", unsafe_allow_html=True)
-            st.link_button("Open Resource Portal ↗", url, key=f"edtech_{url}")
-    else:
-        st.info("ℹ️ No additional platform resources identified.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 📖 Standard Reference Books & Texts")
-    if books:
-        for b in books:
-            b_title = html.escape(str(b.get("title", "Standard Reference Textbook")))
-            author = html.escape(str(b.get("author", "Standard Academic Author")))
-            purpose = html.escape(str(b.get("purpose", "Core Theory & Practice")))
-            url = b.get("url", "#")
-
-            st.markdown(f"""
-<div class="edu-card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span class="badge-tag">📖 Textbook</span>
-    <span style="font-size:0.8rem;color:var(--accent-blue);font-weight:700;">{purpose}</span>
-  </div>
-  <div class="edu-card-title" style="font-size:1.1rem;">{b_title}</div>
-  <div class="edu-card-desc" style="margin-bottom:12px;">Author / Recommended by: <strong>{author}</strong></div>
-</div>
-""", unsafe_allow_html=True)
-            if url and url != "#":
-                st.link_button("View Book Reference ↗", url, key=f"book_{url}")
-    else:
-        st.info("ℹ️ No specific textbook recommendations found for this exam query.")
-
-
-# ── FOOTER ────────────────────────────────────────────────────────────────────
+# ── MINIMAL ACADEMIC FOOTER ───────────────────────────────────────────────────
 st.markdown("""
-<div class="academic-footer">
-  <div class="footer-brand">EXAMGENIE AI</div>
-  <div>Academic Examination Research & Resource Aggregation Platform</div>
-  <div style="margin-top:8px;font-size:0.78rem;color:#94A3B8;">
-    Built with Python & Streamlit • Multi-Agent Verification Architecture
-  </div>
+<div class="edu-footer">
+  <strong>ExamGenie AI</strong> • Comprehensive Academic Examination Research & Preparation
 </div>
 """, unsafe_allow_html=True)

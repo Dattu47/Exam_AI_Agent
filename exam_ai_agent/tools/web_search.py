@@ -1,17 +1,21 @@
 """
 Web Search Tool — DuckDuckGo (ddgs) primary + Google fallback.
-Targeted query generators focused on Tier-1 (.gov/.nic/.ac) and Tier-2 educational platforms.
-Integrated relevance scoring, canonical deduplication, and early spam filtering.
+Multi-faceted, high-recall search query generation covering:
+  - Official Information & Authority
+  - Previous Year Question Papers (PYQs)
+  - Preparation Guides & Subject-Specific Study Materials
+  - Standard Recommended Reference Books
+  - YouTube Video Courses & Playlists
+Features automatic fallback query expansion to ensure high recall across all exams.
 """
 
 import time
 import datetime
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from exam_ai_agent.config import settings
 from exam_ai_agent.utils.logger import get_logger
 from exam_ai_agent.utils.trust_scoring import filter_and_rank_resources
 
@@ -32,22 +36,6 @@ class SearchResult:
         return getattr(self, key, default)
 
 
-# ── Authoritative source domain filters ────────────────────────────────────────
-_OFFICIAL_GOV = (
-    "site:gov.in OR site:nic.in OR site:ac.in OR site:edu.in OR site:nta.ac.in OR site:upsc.gov.in"
-)
-_EXAM_INFO = (
-    "site:careers360.com OR site:shiksha.com OR site:testbook.com OR site:nptel.ac.in"
-)
-_PYQ_SITES = (
-    "site:testbook.com OR site:careers360.com OR site:gateoverflow.in OR site:adda247.com"
-)
-_YT_CHANNELS = (
-    "Unacademy OR \"Physics Wallah\" OR BYJU'S OR \"Gate Smashers\" OR \"Neso Academy\" "
-    "OR StudyIQ OR \"Khan Academy\""
-)
-
-
 # ── Result factory ─────────────────────────────────────────────────────────────
 def _make_result(title: str, url: str, snippet: str) -> Dict[str, str]:
     return {
@@ -57,55 +45,99 @@ def _make_result(title: str, url: str, snippet: str) -> Dict[str, str]:
     }
 
 
-# ── Hyper-Targeted Query Generators ───────────────────────────────────────────
+# ── High-Recall Query Generators ──────────────────────────────────────────────
 
 def get_official_site_query(exam_name: str) -> List[str]:
-    """Find official exam conducting body portal and notifications."""
+    """Broad official authority discovery queries."""
     en = exam_name.strip()
     return [
-        f"{en} official website portal {_OFFICIAL_GOV}",
+        f"{en} official website portal",
         f"{en} official portal notification {CURRENT_YEAR}",
-        f"{en} information bulletin bulletin {_OFFICIAL_GOV}",
+        f"{en} information bulletin {CURRENT_YEAR} PDF",
+        f"{en} conducting authority site:gov.in OR site:nic.in OR site:ac.in",
     ]
 
 
 def get_syllabus_queries(exam_name: str) -> List[str]:
-    """Target official .gov.in / .nic.in / .ac.in sites for authentic syllabus."""
+    """Authoritative syllabus and exam scheme discovery queries."""
     en = exam_name.strip()
     return [
-        f"{en} official syllabus PDF download {_OFFICIAL_GOV}",
+        f"{en} official syllabus PDF download",
         f"{en} information bulletin detailed syllabus PDF",
-        f"{en} complete subject wise syllabus topics {_EXAM_INFO}",
+        f"{en} complete subject wise syllabus topics",
+        f"{en} exam pattern marking scheme syllabus",
     ]
 
 
 def get_pyq_queries(exam_name: str) -> List[str]:
-    """Find authentic previous year question paper PDFs."""
+    """Comprehensive previous year question papers queries."""
     en = exam_name.strip()
     return [
-        f"{en} official previous year question paper PDF {_OFFICIAL_GOV}",
-        f"{en} PYQ solved question papers PDF {CURRENT_YEAR-1} {CURRENT_YEAR-2}",
-        f"{en} previous year question papers solved {_PYQ_SITES}",
+        f"{en} previous year question papers PDF download",
+        f"{en} PYQ question papers solved with answer key",
+        f"{en} solved question papers year wise PDF",
+        f"{en} previous year question paper official",
+        f"{en} question papers shift wise solved",
+    ]
+
+
+def get_preparation_queries(exam_name: str) -> List[str]:
+    """Preparation guides, tutorials, notes, and subject-specific topics."""
+    en = exam_name.strip()
+    queries = [
+        f"{en} complete preparation guide study material",
+        f"{en} important topics subject wise notes",
+        f"{en} practice questions question bank mock test",
+        f"{en} topic wise tutorials notes",
+    ]
+
+    en_lower = en.lower()
+    # Dynamic sub-topic expansion based on exam domain
+    if any(k in en_lower for k in ("cse", "computer", "cs", "software")):
+        queries.extend([
+            f"{en} data structures algorithms notes",
+            f"{en} operating systems dbms preparation",
+            f"{en} computer networks theory of computation notes",
+        ])
+    elif any(k in en_lower for k in ("upsc", "ias", "civil services")):
+        queries.extend([
+            f"{en} polity governance modern history notes",
+            f"{en} economy geography environment preparation",
+            f"{en} csat analytical reasoning study material",
+        ])
+    elif any(k in en_lower for k in ("jee", "iit")):
+        queries.extend([
+            f"{en} physics chemistry mathematics formula sheets notes",
+            f"{en} problem solving practice question bank",
+        ])
+    elif any(k in en_lower for k in ("ssc", "cgl", "chsl")):
+        queries.extend([
+            f"{en} quantitative aptitude reasoning notes",
+            f"{en} general awareness english practice questions",
+        ])
+
+    return queries
+
+
+def get_books_queries(exam_name: str) -> List[str]:
+    """Recognized reference books and topper reading lists."""
+    en = exam_name.strip()
+    return [
+        f"{en} best books for preparation toppers recommended list",
+        f"{en} standard reference textbooks subject wise",
+        f"{en} recommended books list study material",
+        f"{en} topper booklist reference texts",
     ]
 
 
 def get_youtube_queries(exam_name: str) -> List[str]:
-    """Find structured lecture playlists from top creators (exclude Shorts)."""
+    """Full lecture playlists and courses (excluding Shorts)."""
     en = exam_name.strip()
     return [
-        f"{en} complete course playlist site:youtube.com ({_YT_CHANNELS}) -shorts",
-        f"{en} full preparation lectures playlist site:youtube.com -shorts",
-        f"{en} topic wise lectures complete course site:youtube.com",
-    ]
-
-
-def get_books_queries(exam_name: str) -> List[str]:
-    """Find recognized reference books and topper lists."""
-    en = exam_name.strip()
-    return [
-        f"{en} standard reference books list toppers recommendation",
-        f"{en} best books for preparation {_EXAM_INFO}",
-        f"{en} NCERT reference study material list",
+        f"{en} complete course playlist lectures -shorts",
+        f"{en} subject wise playlist free course -shorts",
+        f"{en} previous year questions solved revision -shorts",
+        f"{en} full course marathon preparation lectures -shorts",
     ]
 
 
@@ -113,14 +145,32 @@ def get_topic_deep_dive_query(exam_name: str, topic: str) -> List[str]:
     """Deep-dive queries for a specific syllabus topic."""
     en = exam_name.strip()
     return [
-        f"{en} {topic} detailed notes PDF site:nptel.ac.in OR site:geeksforgeeks.org",
+        f"{en} {topic} detailed notes PDF",
         f"{en} {topic} previous year questions solved",
     ]
 
 
-# ── Core Search Functions ──────────────────────────────────────────────────────
+def generate_search_queries(exam_name: str, category: str = "official") -> List[str]:
+    """Unified helper to generate queries across categories."""
+    cat = (category or "").lower().strip()
+    if cat in ("official", "authority"):
+        return get_official_site_query(exam_name)
+    elif cat in ("syllabus", "curriculum"):
+        return get_syllabus_queries(exam_name)
+    elif cat in ("pyq", "paper", "papers", "previous_papers"):
+        return get_pyq_queries(exam_name)
+    elif cat in ("study", "preparation", "materials", "edtech"):
+        return get_preparation_queries(exam_name)
+    elif cat in ("books", "textbooks"):
+        return get_books_queries(exam_name)
+    elif cat in ("youtube", "video", "videos"):
+        return get_youtube_queries(exam_name)
+    return get_official_site_query(exam_name)
 
-def _ddg_search(query: str, max_results: int = 8) -> List[Dict[str, str]]:
+
+# ── Core Search Engine Invocations ─────────────────────────────────────────────
+
+def _ddg_search(query: str, max_results: int = 10) -> List[Dict[str, str]]:
     """DuckDuckGo search via ddgs or duckduckgo_search library."""
     results = []
     try:
@@ -145,11 +195,11 @@ def _ddg_search(query: str, max_results: int = 8) -> List[Dict[str, str]]:
                     r.get("body") or r.get("snippet") or "",
                 ))
     except Exception as e:
-        logger.debug("DDG search notice for '%s': %s", query[:50], e)
+        logger.debug("DDG search note for '%s': %s", query[:50], e)
     return results
 
 
-def _google_search(query: str, max_results: int = 8) -> List[Dict[str, str]]:
+def _google_search(query: str, max_results: int = 10) -> List[Dict[str, str]]:
     """Google search fallback via googlesearch-python."""
     results = []
     try:
@@ -159,16 +209,16 @@ def _google_search(query: str, max_results: int = 8) -> List[Dict[str, str]]:
             if url:
                 results.append(_make_result(query[:80], url, ""))
     except Exception as e:
-        logger.debug("Google search fallback notice for '%s': %s", query[:50], e)
+        logger.debug("Google search fallback note for '%s': %s", query[:50], e)
     return results
 
 
 def _search_with_retry(
     query: str,
-    max_results: int = 8,
+    max_results: int = 10,
     retries: int = 2,
 ) -> List[Dict[str, str]]:
-    """Search with DuckDuckGo first; fallback to Google. Retries only on exceptions."""
+    """Search with DDG first; fallback to Google. Retries on transient exceptions."""
     for attempt in range(retries):
         try:
             results = _ddg_search(query, max_results=max_results)
@@ -183,12 +233,12 @@ def _search_with_retry(
         except Exception as e:
             logger.debug("Search attempt %d failed for '%s': %s", attempt + 1, query[:50], e)
             if attempt < retries - 1:
-                time.sleep(0.8 * (attempt + 1))
+                time.sleep(0.5 * (attempt + 1))
 
     return []
 
 
-# ── URL-level deduplication & canonical normalization ─────────────────────────
+# ── Canonical Deduplication (By Path, NOT by Domain) ──────────────────────────
 
 def _normalize_url(url: str) -> str:
     """Normalize URL, removing tracking params and canonicalizing YouTube links."""
@@ -233,7 +283,7 @@ def _normalize_url(url: str) -> str:
 
 
 def _deduplicate(results: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """Keep the highest ranked result per canonical normalized URL."""
+    """Deduplicate by canonical URL path, preserving distinct resource pages on the same domain."""
     seen: set = set()
     deduped = []
     for r in results:
@@ -247,17 +297,18 @@ def _deduplicate(results: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return deduped
 
 
-# ── High-level bucket search with early relevance ranking ─────────────────────
+# ── High-Recall Bucket Search with Fallback Expansion ──────────────────────────
 
 def search_bucket(
     queries: List[str],
-    max_per_query: int = 6,
-    delay_between: float = 0.3,
+    max_per_query: int = 8,
+    delay_between: float = 0.2,
     exam_name: Optional[str] = None,
     resource_type: str = "general",
 ) -> List[Dict[str, str]]:
     """
-    Run targeted queries, deduplicate by canonical URL, and apply early trust filtering.
+    Executes multiple targeted queries, deduplicates by canonical URL,
+    and applies fallback query expansion if candidate counts are low.
     """
     all_results: List[Dict[str, str]] = []
     for q in queries:
@@ -268,14 +319,21 @@ def search_bucket(
 
     deduped = _deduplicate(all_results)
 
-    # Early relevance ranking if exam_name is provided
+    # Fallback expansion: if results are very sparse, try broad fallback query
+    if len(deduped) < 4 and exam_name:
+        fallback_q = f"{exam_name} {resource_type} preparation study material"
+        fallback_hits = _search_with_retry(fallback_q, max_results=8)
+        all_results.extend(fallback_hits)
+        deduped = _deduplicate(all_results)
+
+    # Return full candidate list so agents have high recall to work with
     if exam_name:
         return filter_and_rank_resources(
             deduped,
             exam_name=exam_name,
             resource_type=resource_type,
-            min_score=20.0,
-            top_k=max_per_query * 2,
+            min_score=10.0,  # Generous threshold to avoid dropping valid educational content
+            top_k=max(len(deduped), 20),
         )
     return deduped
 
@@ -283,7 +341,7 @@ def search_bucket(
 def search_exam_resources(exam_name: str) -> Dict[str, List[Dict[str, str]]]:
     """
     Run all resource-category searches for the given exam in parallel threads.
-    Applies early trust tiering and deterministic relevance ranking.
+    Generates rich, multifaceted candidate pools ensuring high recall.
     """
     en = exam_name.strip()
 
@@ -291,12 +349,13 @@ def search_exam_resources(exam_name: str) -> Dict[str, List[Dict[str, str]]]:
         "syllabus": (get_syllabus_queries(en), "syllabus"),
         "previous_papers": (get_pyq_queries(en), "pyq"),
         "youtube_lectures": (get_youtube_queries(en), "video"),
-        "study_resources": (get_books_queries(en), "book"),
+        "study_resources": (get_preparation_queries(en), "resource"),
+        "books": (get_books_queries(en), "book"),
         "official_site": (get_official_site_query(en), "authority"),
         "exam_info": (
             [
-                f"{en} official exam pattern marking scheme {_OFFICIAL_GOV}",
-                f"{en} eligibility overview {CURRENT_YEAR} {_EXAM_INFO}",
+                f"{en} official exam pattern marking scheme",
+                f"{en} eligibility overview {CURRENT_YEAR}",
             ],
             "authority",
         ),
@@ -305,16 +364,16 @@ def search_exam_resources(exam_name: str) -> Dict[str, List[Dict[str, str]]]:
     output: Dict[str, List[Dict[str, str]]] = {}
     with ThreadPoolExecutor(max_workers=len(bucket_queries)) as executor:
         futures = {
-            executor.submit(search_bucket, queries, 6, 0.2, en, res_type): key
+            executor.submit(search_bucket, queries, 8, 0.15, en, res_type): key
             for key, (queries, res_type) in bucket_queries.items()
         }
-        for future in as_completed(futures, timeout=50):
+        for future in as_completed(futures, timeout=60):
             key = futures[future]
             try:
-                output[key] = future.result(timeout=40)
-                logger.info("Search bucket '%s' -> %d quality results", key, len(output[key]))
+                output[key] = future.result(timeout=45)
+                logger.info("Search bucket '%s' -> %d high-recall candidates", key, len(output[key]))
             except Exception as e:
-                logger.warning("Search bucket '%s' completed with fallback: %s", key, e)
+                logger.warning("Search bucket '%s' notice: %s", key, e)
                 output[key] = []
 
     # Map aliases for caller compatibility
@@ -327,7 +386,7 @@ def search_exam_resources(exam_name: str) -> Dict[str, List[Dict[str, str]]]:
 class WebSearchTool:
     """Wrapper kept for backward compatibility with existing agent code."""
 
-    def __init__(self, max_results: int = 8):
+    def __init__(self, max_results: int = 10):
         self.max_results = max_results
 
     def search(self, query: str, max_results: Optional[int] = None) -> List[Dict[str, str]]:

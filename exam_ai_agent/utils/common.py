@@ -3,10 +3,9 @@ Shared utility functions for LLM invocation, JSON extraction, and concurrent URL
 """
 
 import re
-import json
 import time
 import urllib3
-from typing import List, Dict, Any, Optional
+from typing import List, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
@@ -83,7 +82,8 @@ def invoke_llm_with_retry(
     base_delay: float = 3.0,
 ) -> Optional[str]:
     """
-    Invoke LLM with exponential backoff on 429 RESOURCE_EXHAUSTED or transient errors.
+    Invoke LLM with exponential backoff on 429 RESOURCE_EXHAUSTED or transient errors,
+    and automatic model fallback on 404 NOT_FOUND.
     Returns response content string, or None on failure.
     """
     if not llm:
@@ -96,6 +96,26 @@ def invoke_llm_with_retry(
             return res.content if hasattr(res, "content") else str(res)
         except Exception as e:
             err_str = str(e)
+            # Automatic model fallback if model is deprecated or not found (404)
+            if "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str.lower():
+                logger.warning("Configured model unavailable (%s). Attempting fallback models...", err_str[:80])
+                api_key = settings.resolve_gemini_key()
+                for fallback_model in ["gemini-2.5-flash", "gemini-flash-latest"]:
+                    try:
+                        from langchain_google_genai import ChatGoogleGenerativeAI
+                        alt_llm = ChatGoogleGenerativeAI(
+                            model=fallback_model,
+                            google_api_key=api_key,
+                            temperature=getattr(llm, "temperature", 0.1),
+                            timeout=settings.LLM_TIMEOUT,
+                        )
+                        res = alt_llm.invoke(messages)
+                        return res.content if hasattr(res, "content") else str(res)
+                    except Exception as alt_err:
+                        logger.debug("Fallback model %s failed: %s", fallback_model, alt_err)
+                logger.error("All fallback models failed for 404 error.")
+                break
+
             is_quota = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower()
             is_transient = "503" in err_str or "500" in err_str or "timeout" in err_str.lower()
 
@@ -202,4 +222,9 @@ def filter_alive_urls_concurrent(
             except Exception:
                 pass
 
-    return [item for i, item in enumerate(items) if i in alive_indices]
+    res = [item for i, item in enumerate(items) if i in alive_indices]
+    if not res and items:
+        # Fallback: if all failed (often due to aggressive bot-blocking or timeouts), keep non-empty URL items
+        logger.debug("[filter_alive_urls_concurrent] All %d items failed liveness check; keeping valid URL candidates as fallback.", len(items))
+        return [item for (_, _, item) in valid_candidates]
+    return res

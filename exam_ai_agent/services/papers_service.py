@@ -1,6 +1,6 @@
 """
 Previous Year Papers Service: Collects, scores, and structures authentic question paper links.
-Prioritizes direct PDF downloads, extracts exam years, and rejects low-quality blog links.
+Prioritizes direct PDF downloads, extracts exam years, and retains rich candidate collections.
 """
 
 import re
@@ -13,7 +13,7 @@ from exam_ai_agent.utils.logger import get_logger
 logger = get_logger(__name__)
 
 _PAPER_KEYWORDS = re.compile(
-    r"\b(paper|pyq|question|previous|year|solved|shift|answer\s*key|sample|mock|test\s*paper)\b",
+    r"\b(paper|pyq|question|previous|year|solved|shift|answer\s*key|sample|mock|test\s*paper|exam\s*paper)\b",
     re.IGNORECASE,
 )
 
@@ -39,7 +39,6 @@ class PapersService:
         """Extract primary 4-digit examination year from title or URL."""
         matches = _YEAR_REGEX.findall(text)
         if matches:
-            # Pick the most recent year mentioned
             return sorted(matches, reverse=True)[0]
         return "Recent"
 
@@ -49,8 +48,8 @@ class PapersService:
         exam_name: str = "",
     ) -> List[Dict[str, Any]]:
         """
-        Build list of previous papers from search results.
-        PDF links are prioritized; non-PDF links are strictly validated.
+        Build list of previous papers from search results with high recall.
+        PDF links are prioritized; non-PDF links from educational portals are retained.
         """
         papers: List[Dict[str, Any]] = []
         seen_urls = set()
@@ -86,7 +85,7 @@ class PapersService:
                 "source": tier_label,
             })
 
-        # 2. Add authenticated non-PDF links matching authentic question papers
+        # 2. Add authenticated non-PDF links matching question papers
         for r in clean_items:
             url = r.get("url") or r.get("href") or r.get("link") or ""
             if not url or self.pdf_tool.is_pdf_url(url):
@@ -102,18 +101,19 @@ class PapersService:
 
             title = r.get("title") or ""
             snippet = r.get("snippet") or ""
+            combined_text = f"{title} {snippet} {url}"
 
-            # Check relevance score if exam_name is provided
+            # Validate that the link is actually about question papers / PYQs
+            if not _PAPER_KEYWORDS.search(combined_text):
+                continue
+
+            # Generous relevance check
             if exam_name:
                 score = calculate_relevance_score(
                     title=title, url=url, snippet=snippet, exam_name=exam_name, resource_type="pyq"
                 )
-                if score < 25.0:
+                if score < 10.0:  # Relaxed to ensure educational websites are preserved
                     continue
-
-            combined_text = f"{title} {snippet} {url}"
-            if not _PAPER_KEYWORDS.search(combined_text):
-                continue
 
             year = self._extract_year(combined_text)
             seen_urls.add(base)
@@ -133,4 +133,4 @@ class PapersService:
 
         # Sort: Official Tier-1 direct PDFs first, then PDFs, then authenticated web links
         papers.sort(key=lambda x: (x.get("is_official", False), x.get("type") == "pdf"), reverse=True)
-        return papers[:15]
+        return papers[:20]

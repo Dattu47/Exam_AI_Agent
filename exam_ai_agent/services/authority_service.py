@@ -7,7 +7,7 @@ checks, and uses structured Gemini LLM prompts for authoritative fact extraction
 import re
 import json
 import urllib3
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 
 import requests
 from bs4 import BeautifulSoup
@@ -18,7 +18,6 @@ from exam_ai_agent.utils.common import (
     get_llm,
     strip_json_fences,
     invoke_llm_with_retry,
-    check_url_alive,
     filter_alive_urls_concurrent,
 )
 from exam_ai_agent.utils.trust_scoring import get_domain_tier, filter_and_rank_resources
@@ -134,19 +133,11 @@ class AuthorityService:
         best_site_url = final_sites[0]["url"]
         scraped_content = self._scrape_text(best_site_url, max_chars=3000)
 
-        # Fallback educational portal context
-        fallback_queries = [
-            f"{en} exam conducting body eligibility overview site:careers360.com OR site:shiksha.com"
-        ]
-        fallback_results = search_bucket(fallback_queries, max_per_query=2, delay_between=0.1)
-        fallback_text = ""
-        for fr in fallback_results[:1]:
-            ft = self._scrape_text(fr.get("url", ""), max_chars=1200)
-            if ft:
-                fallback_text = ft
-                break
-
-        combined_content = (scraped_content + "\n\n" + fallback_text).strip()
+        # Build candidate snippets for rich factual context
+        candidate_snippets = "\n".join(
+            f"- {s.get('title', '')}: {s.get('snippet', '')}" for s in final_sites[:5]
+        )
+        combined_content = (scraped_content + "\n\nCandidate Summaries:\n" + candidate_snippets).strip()
 
         # Hardened LLM prompt with strict role and schema constraints
         prompt = f"""

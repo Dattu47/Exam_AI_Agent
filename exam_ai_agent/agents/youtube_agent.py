@@ -4,11 +4,10 @@ Filters out Shorts and clickbait, categorizes into academic tiers, and validates
 """
 
 import json
-import re
-from typing import List, Dict, Any
+from typing import List, Dict
 from urllib.parse import urlparse, parse_qs
 
-from exam_ai_agent.tools.web_search import search_bucket
+from exam_ai_agent.tools.web_search import search_bucket, generate_search_queries
 from exam_ai_agent.utils.common import (
     get_llm,
     strip_json_fences,
@@ -28,7 +27,8 @@ class YoutubeAgent:
         if not url:
             return False
         try:
-            if "/shorts/" in url.lower():
+            url_lower = url.lower()
+            if "/shorts/" in url_lower or "shorts" in url_lower.split("?")[0]:
                 return False  # Reject YouTube Shorts
 
             parsed = urlparse(url.strip())
@@ -52,29 +52,29 @@ class YoutubeAgent:
             pass
         return url.split("?")[0].rstrip("/").lower()
 
+    def _infer_category(self, title: str, snippet: str) -> str:
+        """Heuristic category assignment when LLM is offline."""
+        text = f"{title} {snippet}".lower()
+        if any(k in text for k in ["pyq", "previous year", "solved paper", "solution", "past year"]):
+            return "PYQ Solving"
+        if any(k in text for k in ["marathon", "revision", "crash course", "quick review", "one shot"]):
+            return "Revision"
+        if any(k in text for k in ["complete", "full course", "masterclass", "entire syllabus", "full syllabus", "playlist"]):
+            return "Full Course"
+        return "Topic-wise"
+
     def get_top_playlists(self, exam_name: str) -> List[Dict[str, str]]:
         """
         Searches for YouTube lecture courses and playlists specifically for the requested exam.
-        Returns curated, categorized, and validated playlist results.
+        Returns curated, categorized, and validated playlist results (6 to 10 items).
         """
         en = exam_name.strip()
         logger.info("[YoutubeAgent] Curating lecture series for: %s", en)
 
-        exam_q = f'"{en}"'
+        # Generate multi-angle search queries
+        yt_queries = generate_search_queries(en, "youtube")
 
-        upsc_channels = "Mrunal Patel OR Study IQ IAS OR Khan GS Research Centre OR Drishti IAS"
-        gate_channels = "Neso Academy OR GATE Smashers OR Ravindrababu Ravula OR Unacademy GATE"
-        bank_channels = "Wifistudy OR Adda247 OR Oliveboard OR Unacademy Banking"
-        general_channels = "Physics Wallah OR Unacademy OR BYJU'S Exam Prep"
-        all_channels = f"{upsc_channels} OR {gate_channels} OR {bank_channels} OR {general_channels}"
-
-        yt_queries = [
-            f"{exam_q} complete preparation playlist site:youtube.com ({all_channels}) -shorts",
-            f"{exam_q} full course lectures playlist site:youtube.com -shorts",
-            f"{exam_q} previous year questions solved playlist site:youtube.com -shorts",
-        ]
-
-        yt_results = search_bucket(yt_queries, max_per_query=6, delay_between=0.2, exam_name=en, resource_type="video")
+        yt_results = search_bucket(yt_queries, max_per_query=8, delay_between=0.15, exam_name=en, resource_type="video")
 
         # Filter strictly for real YouTube URLs (no shorts) and deduplicate
         seen_keys = set()
@@ -96,11 +96,11 @@ class YoutubeAgent:
                 {
                     "title": r.get("title", "Exam Preparation Lecture"),
                     "url": r.get("url"),
-                    "category": "Full Course",
+                    "category": self._infer_category(r.get("title", ""), r.get("snippet", "")),
                     "channel": "Educational Channel",
-                    "description": r.get("snippet", "Comprehensive exam preparation course."),
+                    "description": r.get("snippet", "Comprehensive syllabus lectures."),
                 }
-                for r in yt_valid[:4]
+                for r in yt_valid[:8]
             ]
 
         prompt = f"""
@@ -108,23 +108,24 @@ SYSTEM ROLE:
 You are an expert academic curriculum curator for competitive examinations.
 
 TASK:
-Select and categorize the top 4 most authentic lecture playlists or video series for: {en}.
+Select and categorize the top 6 to 10 most authentic, high-value lecture playlists or video series for: {en}.
 
 CANDIDATE YOUTUBE COURSES:
-{json.dumps(yt_valid[:12], indent=2)}
+{json.dumps(yt_valid[:18], indent=2)}
 
 CATEGORIES ALLOWED:
-- "Foundation / Beginner"
 - "Full Course"
-- "PYQ Solving"
 - "Topic-wise"
+- "PYQ Solving"
+- "Revision"
 
 RULES:
 1. ONLY include courses directly covering "{en}".
 2. Reject single short clips, clickbait, and unrelated examinations.
 3. Extract or infer the channel name if identifiable from title/snippet.
-4. Provide a concise, professional 1-sentence description of the playlist content.
-5. Output ONLY raw JSON array without formatting fences.
+4. Distribute across available categories where possible (Full Course, Topic-wise, PYQ Solving, Revision).
+5. Provide a concise, professional 1-sentence description of the playlist content.
+6. Output ONLY raw JSON array without formatting fences.
 
 OUTPUT JSON SCHEMA:
 [
@@ -132,7 +133,7 @@ OUTPUT JSON SCHEMA:
         "title": "...",
         "url": "...",
         "channel": "...",
-        "category": "Foundation / Beginner | Full Course | PYQ Solving | Topic-wise",
+        "category": "Full Course | Topic-wise | PYQ Solving | Revision",
         "description": "..."
     }}
 ]
@@ -151,26 +152,19 @@ OUTPUT JSON SCHEMA:
             results = json.loads(cleaned)
 
             curated = [r for r in results if self._is_youtube_url(r.get("url", ""))]
-            return curated[:4] if curated else [
-                {
-                    "title": r.get("title", "Exam Lecture"),
-                    "url": r.get("url"),
-                    "category": "Full Course",
-                    "channel": "Verified Channel",
-                    "description": r.get("snippet", "Structured syllabus lectures."),
-                }
-                for r in yt_valid[:4]
-            ]
+            if curated:
+                return curated[:10]
 
         except Exception as e:
             logger.warning("[YoutubeAgent] LLM curation error: %s. Using candidates.", e)
-            return [
-                {
-                    "title": r.get("title", "Exam Lecture"),
-                    "url": r.get("url"),
-                    "category": "Full Course",
-                    "channel": "Verified Channel",
-                    "description": r.get("snippet", "Structured syllabus lectures."),
-                }
-                for r in yt_valid[:4]
-            ]
+
+        return [
+            {
+                "title": r.get("title", "Exam Lecture"),
+                "url": r.get("url"),
+                "category": self._infer_category(r.get("title", ""), r.get("snippet", "")),
+                "channel": "Verified Channel",
+                "description": r.get("snippet", "Structured syllabus lectures."),
+            }
+            for r in yt_valid[:8]
+        ]

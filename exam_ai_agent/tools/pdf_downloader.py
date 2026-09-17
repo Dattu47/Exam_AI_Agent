@@ -6,7 +6,7 @@ Finds PDF links from search results and web pages for exam papers and resources.
 import re
 import urllib3
 from typing import List, Optional, Dict, Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests

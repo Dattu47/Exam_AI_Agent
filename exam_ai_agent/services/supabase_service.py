@@ -96,7 +96,7 @@ class SupabaseService:
     def get_exam_resources(self, exam_name: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve stored exam resources from the database.
-        Returns None if not found (forces a fresh pipeline run).
+        Returns None if not found or if cached payload is empty/incompatible.
         """
         if not self.is_connected() or not exam_name:
             return None
@@ -112,13 +112,42 @@ class SupabaseService:
                 return None
 
             db_data = res.data[0]
-            logger.info("Cache hit: retrieved data for '%s' from Supabase.", exam_name)
+
+            raw_auth = db_data.get("syllabus")
+            raw_archive = db_data.get("previous_papers")
+            raw_videos = db_data.get("youtube_lectures")
+            raw_library = db_data.get("resources")
+
+            # Check for legacy schema or incompatible list format
+            if not isinstance(raw_auth, dict) or not isinstance(raw_library, dict):
+                logger.info(
+                    "Cached data for '%s' uses legacy or incompatible format. Bypassing cache to refresh.",
+                    exam_name,
+                )
+                return None
+
+            # Verify meaningful content exists (avoid returning empty/broken cache)
+            has_meaningful_content = (
+                bool(raw_auth.get("official_site"))
+                or bool(raw_archive)
+                or bool(raw_videos)
+                or bool(raw_library.get("edtech_links"))
+                or bool(raw_library.get("books"))
+            )
+            if not has_meaningful_content:
+                logger.info(
+                    "Cached data for '%s' is empty or invalid. Bypassing cache to conduct fresh research.",
+                    exam_name,
+                )
+                return None
+
+            logger.info("Cache hit: retrieved verified data for '%s' from Supabase.", exam_name)
 
             return {
-                "authority": db_data.get("syllabus", {}),
-                "archive": db_data.get("previous_papers", []),
-                "videos": db_data.get("youtube_lectures", []),
-                "library": db_data.get("resources", {}),
+                "authority": raw_auth,
+                "archive": raw_archive if isinstance(raw_archive, list) else [],
+                "videos": raw_videos if isinstance(raw_videos, list) else [],
+                "library": raw_library,
             }
         except Exception as e:
             logger.warning("Error retrieving exam resources for '%s': %s", exam_name, e)

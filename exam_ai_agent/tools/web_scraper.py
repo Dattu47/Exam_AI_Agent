@@ -6,7 +6,7 @@ Scrapes pages in parallel threads with pooled connections and SSL fallback.
 import re
 import urllib3
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 
 import requests
 from requests.adapters import HTTPAdapter

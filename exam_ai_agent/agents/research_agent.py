@@ -7,7 +7,7 @@ Runs sub-agents in parallel to accelerate end-to-end response time by 4–6x.
 import json
 import time
 from typing import Dict, Any, List
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from exam_ai_agent.services.authority_service import AuthorityService
 from exam_ai_agent.agents.material_aggregator import MaterialAggregator
@@ -21,7 +21,6 @@ from exam_ai_agent.utils.common import (
     invoke_llm_with_retry,
     filter_alive_urls_concurrent,
 )
-from exam_ai_agent.utils.trust_scoring import filter_and_rank_resources
 from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -60,7 +59,7 @@ TASK:
 Filter this list to ONLY include authentic question papers, solved papers, or official mock tests specifically for: {exam_name}.
 
 CANDIDATES TO VERIFY:
-{json.dumps(ambiguous_candidates[:8], indent=2)}
+{json.dumps(ambiguous_candidates[:15], indent=2)}
 
 RULES:
 1. Reject generic preparation articles, blog spam, or unrelated exam links.
@@ -110,7 +109,7 @@ OUTPUT JSON SCHEMA:
 
         # Targeted LLM relevance filter on ambiguous candidates
         filtered = self._filter_pyqs_with_llm(exam_name, dedup_archive)
-        return filtered[:12]
+        return filtered[:18]
 
     def research_exam(self, exam_name: str, force_refresh: bool = False) -> Dict[str, Any]:
         """
@@ -152,14 +151,14 @@ OUTPUT JSON SCHEMA:
 
             # Collect Authority Service
             try:
-                authority_data = future_authority.result(timeout=55)
+                authority_data = future_authority.result(timeout=75)
             except Exception as e:
                 logger.warning("[ResearchAgent] Authority service error: %s", e)
                 authority_data = {}
 
             # Collect Search Agent & process PYQs
             try:
-                search_results = future_search.result(timeout=55)
+                search_results = future_search.result(timeout=75)
                 pyq_archive = self._process_pyqs(clean_exam, search_results)
             except Exception as e:
                 logger.warning("[ResearchAgent] Search agent error: %s", e)
@@ -167,14 +166,14 @@ OUTPUT JSON SCHEMA:
 
             # Collect YouTube Agent
             try:
-                video_playlists = future_youtube.result(timeout=55)
+                video_playlists = future_youtube.result(timeout=75)
             except Exception as e:
                 logger.warning("[ResearchAgent] YouTube agent error: %s", e)
                 video_playlists = []
 
             # Collect Material Aggregator
             try:
-                materials_library = future_materials.result(timeout=55)
+                materials_library = future_materials.result(timeout=75)
             except Exception as e:
                 logger.warning("[ResearchAgent] Material aggregator error: %s", e)
                 materials_library = {}

@@ -4,7 +4,7 @@ Search Agent: Responsible for generating robust search queries and finding initi
 
 from typing import List, Dict, Any, Optional
 
-from exam_ai_agent.tools.web_search import WebSearchTool, SearchResult
+from exam_ai_agent.tools.web_search import WebSearchTool
 from exam_ai_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)

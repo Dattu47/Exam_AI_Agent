@@ -6,7 +6,7 @@ Supports concurrent fetching, multiple Indian regional languages, and robust URL
 import re
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse, parse_qs
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from exam_ai_agent.utils.logger import get_logger
 
